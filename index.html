@@ -1,0 +1,51 @@
+// Function to apply a 5-second speed boost
+function applyRandomBoost() {
+    if (!gameActive) return;
+
+    // Pick Player 1 or Player 2
+    const luckySnake = Math.random() > 0.5 ? snake1 : snake2;
+    const originalColor = luckySnake.color;
+    
+    // Boost Logic: Reduce interval time (effectively doubling speed)
+    luckySnake.isBoosted = true;
+    luckySnake.color = "gold"; // Visual indicator
+
+    console.log(`${luckySnake === snake1 ? 'Green' : 'Blue'} got a SPEED BOOST!`);
+
+    // Reset after 5 seconds
+    setTimeout(() => {
+        luckySnake.isBoosted = false;
+        luckySnake.color = originalColor;
+    }, 5000);
+}
+
+// Trigger every 60 seconds (60,000 milliseconds)
+setInterval(applyRandomBoost, 60000);
+
+// Update the moveSnake logic to handle the boost
+function moveSnake(s) {
+    s.dir = s.nextDir;
+    
+    // If boosted, we run the movement logic twice per frame
+    const moves = s.isBoosted ? 2 : 1;
+    
+    for (let i = 0; i < moves; i++) {
+        const head = { x: s.body[0].x + s.dir.x, y: s.body[0].y + s.dir.y };
+        s.body.unshift(head);
+
+        if (head.x === food.x && head.y === food.y) {
+            food = { 
+                x: Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize, 
+                y: Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize 
+            };
+        } else {
+            s.body.pop();
+        }
+        
+        // Immediate collision check during the second move of a boost
+        if (moves > 1 && checkCollision(s, s === snake1 ? snake2 : snake1)) {
+            gameActive = false;
+            break;
+        }
+    }
+}
