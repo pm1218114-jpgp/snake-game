@@ -1,51 +1,219 @@
-// Function to apply a 5-second speed boost
-function applyRandomBoost() {
-    if (!gameActive) return;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ultimate Snake: Hunter vs Survivor</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; background: #111; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
+        canvas { border: 4px solid #444; background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        .hud { display: flex; gap: 30px; padding: 15px; background: #222; width: 100%; justify-content: center; border-bottom: 2px solid #444; }
+        .stat { text-align: center; min-width: 120px; }
+        .timer-bar { width: 100px; height: 8px; background: #444; margin: 5px auto; border-radius: 4px; overflow: hidden; }
+        .fill { height: 100%; width: 100%; }
+        .hunter-tag { color: #ff4444; font-weight: bold; font-size: 1.2rem; text-shadow: 0 0 10px red; }
+        .active-effect { font-size: 0.8rem; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+    <div class="hud">
+        <div class="stat">
+            <div>P1 (WASD): <span id="p1Blocks">1</span></div>
+            <div id="p1Effect" class="active-effect"></div>
+        </div>
+        <div class="stat">
+            <div class="hunter-tag" id="roleDisplay">HUNTER: P1</div>
+            <div style="font-size: 0.7rem; color: #888;">Survivor needs 10 blocks to win</div>
+        </div>
+        <div class="stat">
+            <div>Next Apple (5s)</div>
+            <div class="timer-bar"><div id="appleFill" class="fill" style="background: #ff4444;"></div></div>
+        </div>
+        <div class="stat">
+            <div>Speed (60s)</div>
+            <div class="timer-bar"><div id="boostFill" class="fill" style="background: #ffff00;"></div></div>
+        </div>
+        <div class="stat">
+            <div>Freeze (120s)</div>
+            <div class="timer-bar"><div id="freezeFill" class="fill" style="background: #00ffff;"></div></div>
+        </div>
+        <div class="stat">
+            <div>P2 (IJKL): <span id="p2Blocks">1</span></div>
+            <div id="p2Effect" class="active-effect"></div>
+        </div>
+    </div>
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
 
-    // Pick Player 1 or Player 2
-    const luckySnake = Math.random() > 0.5 ? snake1 : snake2;
-    const originalColor = luckySnake.color;
-    
-    // Boost Logic: Reduce interval time (effectively doubling speed)
-    luckySnake.isBoosted = true;
-    luckySnake.color = "gold"; // Visual indicator
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const gridSize = 20;
 
-    console.log(`${luckySnake === snake1 ? 'Green' : 'Blue'} got a SPEED BOOST!`);
-
-    // Reset after 5 seconds
-    setTimeout(() => {
-        luckySnake.isBoosted = false;
-        luckySnake.color = originalColor;
-    }, 5000);
-}
-
-// Trigger every 60 seconds (60,000 milliseconds)
-setInterval(applyRandomBoost, 60000);
-
-// Update the moveSnake logic to handle the boost
-function moveSnake(s) {
-    s.dir = s.nextDir;
-    
-    // If boosted, we run the movement logic twice per frame
-    const moves = s.isBoosted ? 2 : 1;
-    
-    for (let i = 0; i < moves; i++) {
-        const head = { x: s.body[0].x + s.dir.x, y: s.body[0].y + s.dir.y };
-        s.body.unshift(head);
-
-        if (head.x === food.x && head.y === food.y) {
-            food = { 
-                x: Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize, 
-                y: Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize 
-            };
-        } else {
-            s.body.pop();
-        }
+        // Players
+        let p1 = { id: 1, body: [{x: 100, y: 100}], dir: {x: 20, y: 0}, nextDir: {x: 20, y: 0}, color: "#0f0", boost: 0, freeze: 0, moveCounter: 0 };
+        let p2 = { id: 2, body: [{x: 680, y: 380}], dir: {x: -20, y: 0}, nextDir: {x: -20, y: 0}, color: "#0cf", boost: 0, freeze: 0, moveCounter: 0 };
+        let hunter = p1; 
+        let survivor = p2;
         
-        // Immediate collision check during the second move of a boost
-        if (moves > 1 && checkCollision(s, s === snake1 ? snake2 : snake1)) {
-            gameActive = false;
-            break;
+        // Items
+        let apple = { x: 400, y: 240, active: true };
+        let boost = null;
+        let freezeItem = null;
+
+        // Timers (ms)
+        let appleTimer = 5000;
+        let boostTimer = 60000;
+        let freezeTimer = 120000;
+        let lastTime = performance.now();
+
+        window.addEventListener("keydown", e => {
+            const key = e.key.toLowerCase();
+            if (key === 'w' && p1.dir.y === 0) p1.nextDir = {x: 0, y: -gridSize};
+            if (key === 's' && p1.dir.y === 0) p1.nextDir = {x: 0, y: gridSize};
+            if (key === 'a' && p1.dir.x === 0) p1.nextDir = {x: -gridSize, y: 0};
+            if (key === 'd' && p1.dir.x === 0) p1.nextDir = {x: gridSize, y: 0};
+            if (key === 'i' && p2.dir.y === 0) p2.nextDir = {x: 0, y: -gridSize};
+            if (key === 'k' && p2.dir.y === 0) p2.nextDir = {x: 0, y: gridSize};
+            if (key === 'j' && p2.dir.x === 0) p2.nextDir = {x: -gridSize, y: 0};
+            if (key === 'l' && p2.dir.x === 0) p2.nextDir = {x: gridSize, y: 0};
+        });
+
+        function spawn() {
+            return {
+                x: Math.floor(Math.random() * (canvas.width/gridSize)) * gridSize,
+                y: Math.floor(Math.random() * (canvas.height/gridSize)) * gridSize
+            };
         }
-    }
-}
+
+        function updateSnake(s, other) {
+            if (s.freeze > 0) return; // Cannot move if frozen
+
+            s.moveCounter++;
+            let speedThreshold = s.boost > 0 ? 2 : 5; // Boosted = move every 2 frames, Normal = 5
+            
+            if (s.moveCounter >= speedThreshold) {
+                s.moveCounter = 0;
+                s.dir = s.nextDir;
+                const head = { x: s.body[0].x + s.dir.x, y: s.body[0].y + s.dir.y };
+                
+                // Screen Wrap
+                if (head.x < 0) head.x = canvas.width - gridSize;
+                else if (head.x >= canvas.width) head.x = 0;
+                if (head.y < 0) head.y = canvas.height - gridSize;
+                else if (head.y >= canvas.height) head.y = 0;
+
+                s.body.unshift(head);
+
+                // Apple logic
+                if (apple.active && head.x === apple.x && head.y === apple.y) {
+                    apple.active = false; // Grow one block
+                } else {
+                    s.body.pop();
+                }
+
+                // Speed Boost logic
+                if (boost && head.x === boost.x && head.y === boost.y) {
+                    s.boost = 10000;
+                    boost = null;
+                }
+
+                // Freeze logic (Survivor only)
+                if (freezeItem && head.x === freezeItem.x && head.y === freezeItem.y) {
+                    other.freeze = 5000; // Freeze opponent for 5s
+                    freezeItem = null;
+                }
+
+                // Combat logic (Hunter shrinks Survivor)
+                if (s === hunter) {
+                    other.body.forEach((part, idx) => {
+                        if (head.x === part.x && head.y === part.y) {
+                            if (other.body.length > 1) other.body.pop();
+                        }
+                    });
+                }
+            }
+        }
+
+        function gameLoop(now) {
+            let dt = now - lastTime;
+            lastTime = now;
+
+            // Global Spawners
+            appleTimer -= dt;
+            if (appleTimer <= 0) { apple = spawn(); apple.active = true; appleTimer = 5000; }
+            
+            boostTimer -= dt;
+            if (boostTimer <= 0) { boost = spawn(); boostTimer = 60000; }
+
+            freezeTimer -= dt;
+            if (freezeTimer <= 0) { freezeItem = spawn(); freezeTimer = 120000; }
+
+            // Active Effect Timers
+            [p1, p2].forEach(s => {
+                if (s.boost > 0) s.boost -= dt;
+                if (s.freeze > 0) s.freeze -= dt;
+            });
+
+            updateSnake(p1, p2);
+            updateSnake(p2, p1);
+
+            // UI Update
+            document.getElementById("appleFill").style.width = (appleTimer / 5000 * 100) + "%";
+            document.getElementById("boostFill").style.width = (boostTimer / 60000 * 100) + "%";
+            document.getElementById("freezeFill").style.width = (freezeTimer / 120000 * 100) + "%";
+            document.getElementById("p1Blocks").innerText = p1.body.length;
+            document.getElementById("p2Blocks").innerText = p2.body.length;
+            document.getElementById("p1Effect").innerText = p1.freeze > 0 ? "FROZEN!" : (p1.boost > 0 ? "SPEED!" : "");
+            document.getElementById("p2Effect").innerText = p2.freeze > 0 ? "FROZEN!" : (p2.boost > 0 ? "SPEED!" : "");
+            document.getElementById("p1Effect").style.color = p1.freeze > 0 ? "#0ff" : "#ff0";
+            document.getElementById("p2Effect").style.color = p2.freeze > 0 ? "#0ff" : "#ff0";
+
+            // Win Condition
+            if (survivor.body.length >= 10) {
+                alert(`Survivor (Player ${survivor.id}) reached 10 blocks! Swapping roles...`);
+                location.reload();
+            }
+
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function draw() {
+            ctx.fillStyle = "black";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (apple.active) {
+                ctx.fillStyle = "#ff4444";
+                ctx.beginPath(); ctx.arc(apple.x + 10, apple.y + 10, 8, 0, Math.PI * 2); ctx.fill();
+            }
+
+            if (boost) {
+                ctx.fillStyle = "#ffff00";
+                ctx.shadowBlur = 15; ctx.shadowColor = "yellow";
+                ctx.beginPath(); ctx.arc(boost.x + 10, boost.y + 10, 10, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            if (freezeItem) {
+                ctx.fillStyle = "#00ffff";
+                ctx.shadowBlur = 15; ctx.shadowColor = "#00ffff";
+                ctx.beginPath(); ctx.arc(freezeItem.x + 10, freezeItem.y + 10, 10, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            [p1, p2].forEach(s => {
+                ctx.fillStyle = s.freeze > 0 ? "#444" : s.color;
+                s.body.forEach((part, i) => {
+                    ctx.fillRect(part.x, part.y, gridSize - 2, gridSize - 2);
+                    if (s === hunter && i === 0) {
+                        ctx.strokeStyle = "white";
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(part.x, part.y, gridSize - 2, gridSize - 2);
+                    }
+                });
+            });
+        }
+
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
