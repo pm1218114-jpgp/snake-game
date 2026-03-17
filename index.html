@@ -2,137 +2,178 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Snake Tag: Hunter vs Survivor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Tag: Hunter vs Survivors</title>
     <style>
-        body { background: #1a1a1a; color: #eee; text-align: center; font-family: 'Segoe UI', sans-serif; }
-        canvas { border: 4px solid #444; background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .stats { display: flex; justify-content: center; gap: 50px; font-size: 20px; margin-top: 10px; }
-        .hunter { color: #2ecc71; font-weight: bold; }
-        .survivor { color: #e74c3c; font-weight: bold; }
-        .info { color: #f1c40f; font-size: 14px; }
+        body { 
+            background: #1a1a1a; 
+            color: #eee; 
+            text-align: center; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            overflow: hidden;
+        }
+        .ui { 
+            display: flex; 
+            justify-content: center; 
+            gap: 30px; 
+            padding: 20px; 
+            background: #2c3e50;
+            border-bottom: 4px solid #34495e;
+        }
+        canvas { 
+            border: 5px solid #444; 
+            background: #000; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            margin-top: 20px;
+        }
+        .h { color: #2ecc71; font-weight: bold; }
+        .s1 { color: #e74c3c; font-weight: bold; }
+        .s2 { color: #3498db; font-weight: bold; }
+        .keys { font-size: 11px; color: #bdc3c7; display: block; }
+        .goal { color: #f1c40f; font-size: 14px; margin-top: 5px; }
     </style>
 </head>
 <body>
-    <h1>Snake Tag</h1>
-    <div class="stats">
-        <div id="p1Status" class="hunter">P1: HUNTER</div>
-        <div id="p2Status" class="survivor">P2: SURVIVOR (Blocks: 1/10)</div>
+
+    <div class="ui">
+        <div class="h">HUNTER<span class="keys">ARROW KEYS</span><span id="h-stat">Size: 5</span></div>
+        <div class="s1">SURVIVOR 1<span class="keys">W,A,S,D</span><span id="s1-stat">Size: 2/10</span></div>
+        <div class="s2">SURVIVOR 2<span class="keys">I,J,K,L</span><span id="s2-stat">Size: 2/10</span></div>
     </div>
-    <canvas id="game" width="600" height="400"></canvas>
-    <p class="info">Hunter (Arrows) tags Survivor (WASD) to remove blocks. Survivor eats 10 apples to win!</p>
+    <div class="goal">Survivors: Eat 10 Golden Apples to win and become the Hunter!</div>
+
+    <canvas id="game" width="800" height="500"></canvas>
 
     <script>
         const canvas = document.getElementById('game');
         const ctx = canvas.getContext('2d');
         const grid = 20;
         let count = 0;
-        let p1IsHunter = true;
 
-        let hunter = { x: 40, y: 40, dx: grid, dy: 0, cells: [], maxCells: 5, color: '#2ecc71' };
-        let survivor = { x: 540, y: 340, dx: -grid, dy: 0, cells: [], maxCells: 2, color: '#e74c3c' };
+        // Player Objects
+        let hunter = { x: 400, y: 250, dx: grid, dy: 0, cells: [], maxCells: 5, color: '#2ecc71', id: 'h' };
+        let s1 = { x: 100, y: 100, dx: 0, dy: grid, cells: [], maxCells: 2, color: '#e74c3c', id: 's1' };
+        let s2 = { x: 700, y: 400, dx: 0, dy: -grid, cells: [], maxCells: 2, color: '#3498db', id: 's2' };
+        
         let apples = [{ x: 300, y: 200 }];
 
-        function getRandomInt(min, max) { return Math.floor(Math.random() * (max - min)) + min; }
-
-        function spawnApple() {
-            apples.push({
-                x: getRandomInt(0, canvas.width / grid) * grid,
-                y: getRandomInt(0, canvas.height / grid) * grid
-            });
+        function getRandomCoord(max) {
+            return Math.floor(Math.random() * (max / grid)) * grid;
         }
 
-        // Spawn apple every 5 seconds
-        setInterval(spawnApple, 5000);
+        // Spawn a new apple every 5 seconds
+        setInterval(() => {
+            apples.push({ x: getRandomCoord(canvas.width), y: getRandomCoord(canvas.height) });
+        }, 5000);
 
-        function resetRound(winner) {
-            alert(winner + " Wins! Roles swapping...");
-            p1IsHunter = !p1IsHunter;
-            hunter.maxCells = 5;
-            survivor.maxCells = 2;
-            hunter.x = 40; hunter.y = 40; hunter.dx = grid; hunter.dy = 0; hunter.cells = [];
-            survivor.x = 540; survivor.y = 340; survivor.dx = -grid; survivor.dy = 0; survivor.cells = [];
+        function resetGame(message) {
+            alert(message);
+            // Reset stats
+            hunter.maxCells = 5; hunter.cells = []; hunter.x = 400; hunter.y = 250;
+            s1.maxCells = 2; s1.cells = []; s1.x = 100; s1.y = 100;
+            s2.maxCells = 2; s2.cells = []; s2.x = 700; s2.y = 400;
             apples = [{ x: 300, y: 200 }];
+            updateScoreboard();
         }
 
-        function updateUI() {
-            const p1 = document.getElementById('p1Status');
-            const p2 = document.getElementById('p2Status');
-            if(p1IsHunter) {
-                p1.className = 'hunter'; p1.innerHTML = "P1: HUNTER";
-                p2.className = 'survivor'; p2.innerHTML = `P2: SURVIVOR (Size: ${survivor.maxCells}/10)`;
-            } else {
-                p2.className = 'hunter'; p2.innerHTML = "P2: HUNTER";
-                p1.className = 'survivor'; p1.innerHTML = `P1: SURVIVOR (Size: ${hunter.maxCells}/10)`;
-            }
+        function updateScoreboard() {
+            document.getElementById('s1-stat').innerText = `Size: ${s1.maxCells}/10`;
+            document.getElementById('s2-stat').innerText = `Size: ${s2.maxCells}/10`;
+            document.getElementById('h-stat').innerText = `Size: ${hunter.maxCells}`;
         }
 
         function loop() {
             requestAnimationFrame(loop);
-            if (++count < 7) return; 
+
+            // Game speed control (lower is faster)
+            if (++count < 6) return;
             count = 0;
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            updateUI();
 
-            let players = p1IsHunter ? { h: hunter, s: survivor } : { h: survivor, s: hunter };
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            [hunter, survivor].forEach(snake => {
+            // Draw Apples
+            ctx.fillStyle = '#f1c40f';
+            apples.forEach(apple => {
+                ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
+            });
+
+            // Move and Draw Snakes
+            [hunter, s1, s2].forEach(snake => {
                 snake.x += snake.dx;
                 snake.y += snake.dy;
 
+                // Screen Wrap
                 if (snake.x < 0) snake.x = canvas.width - grid;
                 else if (snake.x >= canvas.width) snake.x = 0;
                 if (snake.y < 0) snake.y = canvas.height - grid;
                 else if (snake.y >= canvas.height) snake.y = 0;
 
-                snake.cells.unshift({x: snake.x, y: snake.y});
+                snake.cells.unshift({ x: snake.x, y: snake.y });
                 if (snake.cells.length > snake.maxCells) snake.cells.pop();
 
+                // Draw each cell
                 ctx.fillStyle = snake.color;
-                snake.cells.forEach((cell) => {
-                    ctx.fillRect(cell.x, cell.y, grid-1, grid-1);
-                    
-                    // Survivor eats apple
+                snake.cells.forEach(cell => {
+                    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
+                });
+
+                // Survivor Logic: Eating Apples
+                if (snake.id !== 'h') {
                     apples.forEach((apple, index) => {
-                        if (players.s.cells[0].x === apple.x && players.s.cells[0].y === apple.y) {
-                            players.s.maxCells++;
+                        if (snake.x === apple.x && snake.y === apple.y) {
+                            snake.maxCells++;
                             apples.splice(index, 1);
-                            if (players.s.maxCells >= 10) resetRound(p1IsHunter ? "Player 2" : "Player 1");
+                            updateScoreboard();
+                            if (snake.maxCells >= 10) {
+                                resetGame(snake.id === 's1' ? "Survivor 1 Wins! They are the new Hunter." : "Survivor 2 Wins! They are the new Hunter.");
+                            }
                         }
                     });
-                });
-            });
-
-            // Hunter tags Survivor
-            players.s.cells.forEach((sCell, index) => {
-                if (players.h.cells[0].x === sCell.x && players.h.cells[0].y === sCell.y) {
-                    if (players.s.maxCells > 1) {
-                        players.s.maxCells--;
-                        players.s.cells.pop();
-                        // Brief teleport to prevent instant multi-hit
-                        players.h.x = getRandomInt(0, 10) * grid; 
-                    } else {
-                        resetRound(p1IsHunter ? "Player 1" : "Player 2");
-                    }
                 }
             });
 
-            ctx.fillStyle = '#f1c40f';
-            apples.forEach(apple => ctx.fillRect(apple.x, apple.y, grid-1, grid-1));
+            // Hunter Logic: Tagging Survivors
+            [s1, s2].forEach(survivor => {
+                survivor.cells.forEach((cell, index) => {
+                    if (hunter.x === cell.x && hunter.y === cell.y) {
+                        if (survivor.maxCells > 1) {
+                            survivor.maxCells--;
+                            survivor.cells.pop();
+                            updateScoreboard();
+                            // Teleport hunter slightly to prevent instant double-tags
+                            hunter.x = getRandomCoord(canvas.width);
+                            hunter.y = getRandomCoord(canvas.height);
+                        } else {
+                            resetGame("The Hunter has caught a survivor! Hunter wins the round.");
+                        }
+                    }
+                });
+            });
         }
 
-        document.addEventListener('keydown', e => {
-            // P1: Arrows
-            if (e.which === 37 && hunter.dx === 0) { hunter.dx = -grid; hunter.dy = 0; }
-            else if (e.which === 38 && hunter.dy === 0) { hunter.dy = -grid; hunter.dx = 0; }
-            else if (e.which === 39 && hunter.dx === 0) { hunter.dx = grid; hunter.dy = 0; }
-            else if (e.which === 40 && hunter.dy === 0) { hunter.dy = grid; hunter.dx = 0; }
-            // P2: WASD
-            if (e.which === 65 && survivor.dx === 0) { survivor.dx = -grid; survivor.dy = 0; }
-            else if (e.which === 87 && survivor.dy === 0) { survivor.dy = -grid; survivor.dx = 0; }
-            else if (e.which === 68 && survivor.dx === 0) { survivor.dx = grid; survivor.dy = 0; }
-            else if (e.which === 83 && survivor.dy === 0) { survivor.dy = grid; survivor.dx = 0; }
+        // Keyboard Controls
+        document.addEventListener('keydown', (e) => {
+            // Hunter: Arrows
+            if (e.key === 'ArrowLeft' && hunter.dx === 0) { hunter.dx = -grid; hunter.dy = 0; }
+            else if (e.key === 'ArrowUp' && hunter.dy === 0) { hunter.dy = -grid; hunter.dx = 0; }
+            else if (e.key === 'ArrowRight' && hunter.dx === 0) { hunter.dx = grid; hunter.dy = 0; }
+            else if (e.key === 'ArrowDown' && hunter.dy === 0) { hunter.dy = grid; hunter.dx = 0; }
+
+            // S1: WASD
+            if (e.key.toLowerCase() === 'a' && s1.dx === 0) { s1.dx = -grid; s1.dy = 0; }
+            else if (e.key.toLowerCase() === 'w' && s1.dy === 0) { s1.dy = -grid; s1.dx = 0; }
+            else if (e.key.toLowerCase() === 'd' && s1.dx === 0) { s1.dx = grid; s1.dy = 0; }
+            else if (e.key.toLowerCase() === 's' && s1.dy === 0) { s1.dy = grid; s1.dx = 0; }
+
+            // S2: IJKL
+            if (e.key.toLowerCase() === 'j' && s2.dx === 0) { s2.dx = -grid; s2.dy = 0; }
+            else if (e.key.toLowerCase() === 'i' && s2.dy === 0) { s2.dy = -grid; s2.dx = 0; }
+            else if (e.key.toLowerCase() === 'l' && s2.dx === 0) { s2.dx = grid; s2.dy = 0; }
+            else if (e.key.toLowerCase() === 'k' && s2.dy === 0) { s2.dy = grid; s2.dx = 0; }
         });
 
+        // Start Game
         requestAnimationFrame(loop);
     </script>
 </body>
