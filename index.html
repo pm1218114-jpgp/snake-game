@@ -3,178 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Tag: Hunter vs Survivors</title>
+    <title>Minecraft Ultimate Edition</title>
     <style>
-        body { 
-            background: #1a1a1a; 
-            color: #eee; 
-            text-align: center; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            margin: 0; 
-            overflow: hidden;
-        }
-        .ui { 
-            display: flex; 
-            justify-content: center; 
-            gap: 30px; 
-            padding: 20px; 
-            background: #2c3e50;
-            border-bottom: 4px solid #34495e;
-        }
-        canvas { 
-            border: 5px solid #444; 
-            background: #000; 
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            margin-top: 20px;
-        }
-        .h { color: #2ecc71; font-weight: bold; }
-        .s1 { color: #e74c3c; font-weight: bold; }
-        .s2 { color: #3498db; font-weight: bold; }
-        .keys { font-size: 11px; color: #bdc3c7; display: block; }
-        .goal { color: #f1c40f; font-size: 14px; margin-top: 5px; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        #ui { position: fixed; inset: 0; pointer-events: none; z-index: 100; color: white; text-shadow: 2px 2px #000; padding: 20px; }
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 16px; height: 16px; border: 2px solid #fff; transform: translate(-50%, -50%); opacity: 0.5; }
+        #stats { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; }
+        .bar { width: 180px; height: 12px; background: rgba(0,0,0,0.6); border: 2px solid #333; }
+        #hp-fill { background: #ff4747; width: 100%; height: 100%; transition: width 0.2s; }
+        #hg-fill { background: #ffb847; width: 100%; height: 100%; transition: width 0.2s; }
+        #hotbar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; background: rgba(0,0,0,0.85); padding: 6px; border: 4px solid #111; gap: 6px; pointer-events: auto; }
+        .slot { width: 48px; height: 48px; background: #8b8b8b; border: 3px solid #444; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transition: 0.1s; }
+        .slot.active { border-color: #fff; background: rgba(255,255,255,0.2); transform: scale(1.1); }
+        #death-screen { position: fixed; inset: 0; background: rgba(100,0,0,0.9); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; pointer-events: auto; }
+        #damage-flash { position: fixed; inset: 0; background: rgba(255,0,0,0); pointer-events: none; z-index: 500; transition: background 0.1s; }
+        button { padding: 12px 30px; font-size: 18px; background: #111; color: #fff; border: 2px solid #fff; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div class="ui">
-        <div class="h">HUNTER<span class="keys">ARROW KEYS</span><span id="h-stat">Size: 5</span></div>
-        <div class="s1">SURVIVOR 1<span class="keys">W,A,S,D</span><span id="s1-stat">Size: 2/10</span></div>
-        <div class="s2">SURVIVOR 2<span class="keys">I,J,K,L</span><span id="s2-stat">Size: 2/10</span></div>
+    <div id="damage-flash"></div>
+    <div id="ui">
+        <div>FPS: <span id="fps">0</span> | Time: <span id="clock">12:00</span></div>
+        <div>Biome: <span id="biome">Wilderness</span></div>
     </div>
-    <div class="goal">Survivors: Eat 10 Golden Apples to win and become the Hunter!</div>
+    <div id="crosshair"></div>
+    <div id="stats">
+        <div class="bar"><div id="hp-fill"></div></div>
+        <div class="bar"><div id="hg-fill"></div></div>
+    </div>
+    <div id="hotbar">
+        <div class="slot active" data-id="0">🌿</div><div class="slot" data-id="1">🧱</div>
+        <div class="slot" data-id="2">🪵</div><div class="slot" data-id="3">🏖️</div>
+        <div class="slot" data-id="4">💎</div>
+    </div>
+    <div id="death-screen"><h1>YOU DIED</h1><button onclick="location.reload()">RESPAWN</button></div>
 
-    <canvas id="game" width="800" height="500"></canvas>
+    <script type="importmap">{ "imports": { "three": "https://unpkg.com" } }</script>
+    <script type="module">
+        import * as THREE from 'three';
 
-    <script>
-        const canvas = document.getElementById('game');
-        const ctx = canvas.getContext('2d');
-        const grid = 20;
-        let count = 0;
+        // --- 1. ENGINE CORE ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-        // Player Objects
-        let hunter = { x: 400, y: 250, dx: grid, dy: 0, cells: [], maxCells: 5, color: '#2ecc71', id: 'h' };
-        let s1 = { x: 100, y: 100, dx: 0, dy: grid, cells: [], maxCells: 2, color: '#e74c3c', id: 's1' };
-        let s2 = { x: 700, y: 400, dx: 0, dy: -grid, cells: [], maxCells: 2, color: '#3498db', id: 's2' };
-        
-        let apples = [{ x: 300, y: 200 }];
+        // --- 2. GAME STATE ---
+        const CHUNK_SIZE = 16, RENDER_DIST = 3;
+        let hp = 100, hg = 100, isDead = false, velY = 0, canJump = false, dayTime = 1.5;
+        const chunks = new Map(), particles = [], zombies = [], keys = {};
+        let selected = 0;
 
-        function getRandomCoord(max) {
-            return Math.floor(Math.random() * (max / grid)) * grid;
-        }
+        const mats = [
+            new THREE.MeshLambertMaterial({ color: 0x567d46 }), // Grass
+            new THREE.MeshLambertMaterial({ color: 0x808080 }), // Stone
+            new THREE.MeshLambertMaterial({ color: 0x664422 }), // Wood
+            new THREE.MeshLambertMaterial({ color: 0xe2c699 }), // Sand
+            new THREE.MeshLambertMaterial({ color: 0x00ffff })  // Diamond
+        ];
+        const box = new THREE.BoxGeometry(1, 1, 1);
 
-        // Spawn a new apple every 5 seconds
-        setInterval(() => {
-            apples.push({ x: getRandomCoord(canvas.width), y: getRandomCoord(canvas.height) });
-        }, 5000);
+        // --- 3. WORLD GEN ---
+        const getH = (x, z) => Math.floor(Math.sin(x * 0.1) * Math.cos(z * 0.1) * 5 + 10);
 
-        function resetGame(message) {
-            alert(message);
-            // Reset stats
-            hunter.maxCells = 5; hunter.cells = []; hunter.x = 400; hunter.y = 250;
-            s1.maxCells = 2; s1.cells = []; s1.x = 100; s1.y = 100;
-            s2.maxCells = 2; s2.cells = []; s2.x = 700; s2.y = 400;
-            apples = [{ x: 300, y: 200 }];
-            updateScoreboard();
-        }
-
-        function updateScoreboard() {
-            document.getElementById('s1-stat').innerText = `Size: ${s1.maxCells}/10`;
-            document.getElementById('s2-stat').innerText = `Size: ${s2.maxCells}/10`;
-            document.getElementById('h-stat').innerText = `Size: ${hunter.maxCells}`;
-        }
-
-        function loop() {
-            requestAnimationFrame(loop);
-
-            // Game speed control (lower is faster)
-            if (++count < 6) return;
-            count = 0;
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Apples
-            ctx.fillStyle = '#f1c40f';
-            apples.forEach(apple => {
-                ctx.fillRect(apple.x, apple.y, grid - 1, grid - 1);
-            });
-
-            // Move and Draw Snakes
-            [hunter, s1, s2].forEach(snake => {
-                snake.x += snake.dx;
-                snake.y += snake.dy;
-
-                // Screen Wrap
-                if (snake.x < 0) snake.x = canvas.width - grid;
-                else if (snake.x >= canvas.width) snake.x = 0;
-                if (snake.y < 0) snake.y = canvas.height - grid;
-                else if (snake.y >= canvas.height) snake.y = 0;
-
-                snake.cells.unshift({ x: snake.x, y: snake.y });
-                if (snake.cells.length > snake.maxCells) snake.cells.pop();
-
-                // Draw each cell
-                ctx.fillStyle = snake.color;
-                snake.cells.forEach(cell => {
-                    ctx.fillRect(cell.x, cell.y, grid - 1, grid - 1);
-                });
-
-                // Survivor Logic: Eating Apples
-                if (snake.id !== 'h') {
-                    apples.forEach((apple, index) => {
-                        if (snake.x === apple.x && snake.y === apple.y) {
-                            snake.maxCells++;
-                            apples.splice(index, 1);
-                            updateScoreboard();
-                            if (snake.maxCells >= 10) {
-                                resetGame(snake.id === 's1' ? "Survivor 1 Wins! They are the new Hunter." : "Survivor 2 Wins! They are the new Hunter.");
-                            }
-                        }
-                    });
-                }
-            });
-
-            // Hunter Logic: Tagging Survivors
-            [s1, s2].forEach(survivor => {
-                survivor.cells.forEach((cell, index) => {
-                    if (hunter.x === cell.x && hunter.y === cell.y) {
-                        if (survivor.maxCells > 1) {
-                            survivor.maxCells--;
-                            survivor.cells.pop();
-                            updateScoreboard();
-                            // Teleport hunter slightly to prevent instant double-tags
-                            hunter.x = getRandomCoord(canvas.width);
-                            hunter.y = getRandomCoord(canvas.height);
-                        } else {
-                            resetGame("The Hunter has caught a survivor! Hunter wins the round.");
-                        }
+        function buildChunk(cx, cz) {
+            const inst = new THREE.InstancedMesh(box, mats, CHUNK_SIZE**2 * 4);
+            const dummy = new THREE.Object3D();
+            let i = 0;
+            for(let x=0; x<CHUNK_SIZE; x++) {
+                for(let z=0; z<CHUNK_SIZE; z++) {
+                    const wx = cx*CHUNK_SIZE+x, wz = cz*CHUNK_SIZE+z, h = getH(wx, wz);
+                    for(let y=h; y>h-3; y--) {
+                        dummy.position.set(wx, y, wz); dummy.updateMatrix();
+                        inst.setMatrixAt(i++, dummy.matrix);
                     }
-                });
-            });
+                    if(Math.random() > 0.99) spawnTree(wx, h+1, wz);
+                }
+            }
+            scene.add(inst); chunks.set(`${cx},${cz}`, inst);
         }
 
-        // Keyboard Controls
-        document.addEventListener('keydown', (e) => {
-            // Hunter: Arrows
-            if (e.key === 'ArrowLeft' && hunter.dx === 0) { hunter.dx = -grid; hunter.dy = 0; }
-            else if (e.key === 'ArrowUp' && hunter.dy === 0) { hunter.dy = -grid; hunter.dx = 0; }
-            else if (e.key === 'ArrowRight' && hunter.dx === 0) { hunter.dx = grid; hunter.dy = 0; }
-            else if (e.key === 'ArrowDown' && hunter.dy === 0) { hunter.dy = grid; hunter.dx = 0; }
+        function spawnTree(x, y, z) {
+            const t = new THREE.Mesh(new THREE.BoxGeometry(0.5, 4, 0.5), mats[2]);
+            t.position.set(x, y+2, z); scene.add(t);
+        }
 
-            // S1: WASD
-            if (e.key.toLowerCase() === 'a' && s1.dx === 0) { s1.dx = -grid; s1.dy = 0; }
-            else if (e.key.toLowerCase() === 'w' && s1.dy === 0) { s1.dy = -grid; s1.dx = 0; }
-            else if (e.key.toLowerCase() === 'd' && s1.dx === 0) { s1.dx = grid; s1.dy = 0; }
-            else if (e.key.toLowerCase() === 's' && s1.dy === 0) { s1.dy = grid; s1.dx = 0; }
+        // --- 4. ZOMBIE CLASS ---
+        class Zombie {
+            constructor(x, z) {
+                this.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 2, 0.8), new THREE.MeshLambertMaterial({color: 0x228b22}));
+                this.mesh.position.set(x, 20, z);
+                scene.add(this.mesh);
+            }
+            update() {
+                const d = this.mesh.position.distanceTo(camera.position);
+                if(d < 20 && d > 1.2) {
+                    this.mesh.lookAt(camera.position.x, this.mesh.position.y, camera.position.z);
+                    this.mesh.translateZ(0.05);
+                } else if(d <= 1.2) hurt(10);
+            }
+        }
 
-            // S2: IJKL
-            if (e.key.toLowerCase() === 'j' && s2.dx === 0) { s2.dx = -grid; s2.dy = 0; }
-            else if (e.key.toLowerCase() === 'i' && s2.dy === 0) { s2.dy = -grid; s2.dx = 0; }
-            else if (e.key.toLowerCase() === 'l' && s2.dx === 0) { s2.dx = grid; s2.dy = 0; }
-            else if (e.key.toLowerCase() === 'k' && s2.dy === 0) { s2.dy = grid; s2.dx = 0; }
+        // --- 5. LOGIC & INPUT ---
+        function hurt(amt) {
+            hp -= amt; document.getElementById('hp-fill').style.width = hp+"%";
+            document.getElementById('damage-flash').style.background = "rgba(255,0,0,0.4)";
+            setTimeout(()=>document.getElementById('damage-flash').style.background="transparent", 100);
+            if(hp <= 0 && !isDead) { isDead = true; document.getElementById('death-screen').style.display='flex'; document.exitPointerLock(); }
+        }
+
+        window.onkeydown = e => { 
+            keys[e.code] = true; 
+            if(e.code.startsWith('Digit')) {
+                selected = (parseInt(e.key)-1)%5;
+                document.querySelectorAll('.slot').forEach((s,i)=>s.className = i===selected?'slot active':'slot');
+            }
+        };
+        window.onkeyup = e => keys[e.code] = false;
+        document.body.onclick = () => !isDead && document.body.requestPointerLock();
+
+        const ray = new THREE.Raycaster();
+        document.addEventListener('mousedown', e => {
+            if(document.pointerLockElement !== document.body || isDead) return;
+            ray.setFromCamera({x:0, y:0}, camera);
+            const hit = ray.intersectObjects(scene.children)[0];
+            if(hit) {
+                if(e.shiftKey) {
+                    const b = new THREE.Mesh(box, mats[selected]);
+                    b.position.copy(hit.point.round().add(hit.face.normal)); scene.add(b);
+                } else { scene.remove(hit.object); }
+            }
         });
 
-        // Start Game
-        requestAnimationFrame(loop);
+        // --- 6. MAIN LOOP ---
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2); scene.add(sun, new THREE.AmbientLight(0xffffff, 0.4));
+        camera.position.set(0, 25, 0);
+
+        function animate() {
+            if(isDead) return;
+            requestAnimationFrame(animate);
+            const speed = keys.ShiftLeft ? 0.25 : 0.12;
+            if(keys.KeyW) camera.translateZ(-speed); if(keys.KeyS) camera.translateZ(speed);
+            if(keys.KeyA) camera.translateX(-speed); if(keys.KeyD) camera.translateX(speed);
+            
+            // Physics
+            velY -= 0.01; camera.position.y += velY;
+            const gy = getH(Math.round(camera.position.x), Math.round(camera.position.z)) + 2;
+            if(camera.position.y < gy) { 
+                if(velY < -0.4) hurt(Math.abs(velY)*20);
+                camera.position.y = gy; velY = 0; canJump = true; 
+            }
+            if(keys.Space && canJump) { velY = 0.25; canJump = false; }
+
+            // Chunks & Environment
+            const cx = Math.floor(camera.position.x/CHUNK_SIZE), cz = Math.floor(camera.position.z/CHUNK_SIZE);
+            for(let x=cx-1; x<=cx+1; x++) for(let z=cz-1; z<=cz+1; z++) if(!chunks.has(`${x},${z}`)) buildChunk(x, z);
+            
+            dayTime += 0.002; sun.position.set(Math.sin(dayTime)*50, Math.cos(dayTime)*50, 10);
+            scene.background = new THREE.Color().setHSL(0.6, 0.5, Math.max(0.1, Math.cos(dayTime)*0.5+0.5));
+            document.getElementById('clock').innerText = `${Math.floor((dayTime%6.2)*3.8)}:00`;
+            
+            if(Math.random() > 0.995 && Math.cos(dayTime) < 0) zombies.push(new Zombie(camera.position.x+20, camera.position.z+20));
+            zombies.forEach(z => z.update());
+            
+            renderer.render(scene, camera);
+        }
+        animate();
+        window.onresize = () => { camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
     </script>
 </body>
 </html>
