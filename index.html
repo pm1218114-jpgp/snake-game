@@ -2,107 +2,164 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minecraft Fix: No Black Screen</title>
+    <title>4-Way Split-Screen Slither</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: sans-serif; }
-        #crosshair { position: fixed; top: 50%; left: 50%; width: 14px; height: 14px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-        #ui { position: fixed; top: 10px; left: 10px; color: white; text-shadow: 1px 1px #000; z-index: 100; }
+        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; }
+        .container { display: flex; width: 100vw; height: 100vh; }
+        .viewport { position: relative; width: 50%; height: 100%; border-right: 2px solid #444; overflow: hidden; }
+        canvas { display: block; background: #1a1a1a; }
+        .ui { position: absolute; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.7); padding: 8px 12px; border-radius: 5px; border: 1px solid #555; }
     </style>
 </head>
 <body>
-    <div id="ui">WASD to Move | Click to Lock | Shift+Click to Build | Left-Click to Mine</div>
-    <div id="crosshair"></div>
+    <div class="container">
+        <div class="viewport">
+            <div class="ui"><b>P1 (WASD)</b><br>Score: <span id="score1">0</span></div>
+            <canvas id="canvas1"></canvas>
+        </div>
+        <div class="viewport">
+            <div class="ui"><b>P2 (Arrows)</b><br>Score: <span id="score2">0</span></div>
+            <canvas id="canvas2"></canvas>
+        </div>
+    </div>
 
-    <script type="importmap">{ "imports": { "three": "https://unpkg.com" } }</script>
-    <script type="module">
-        import * as THREE from 'three';
+    <script>
+        const c1 = document.getElementById('canvas1');
+        const c2 = document.getElementById('canvas2');
+        const ctx1 = c1.getContext('2d');
+        const ctx2 = c2.getContext('2d');
 
-        // --- 1. SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        // --- 2. LIGHTING ---
-        // Lights are crucial; without them, everything is black
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
-        scene.add(hemiLight);
-
-        // --- 3. MATERIALS ---
-        const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-        const mats = [
-            new THREE.MeshLambertMaterial({ color: 0x567d46 }), // Grass
-            new THREE.MeshLambertMaterial({ color: 0x8b4513 }), // Dirt
-            new THREE.MeshLambertMaterial({ color: 0x808080 })  // Stone
-        ];
-
-        // --- 4. WORLD GENERATION ---
-        const blocks = [];
-        function generateWorld() {
-            // Smaller initial area to ensure fast loading
-            for (let x = -10; x < 10; x++) {
-                for (let z = -10; z < 10; z++) {
-                    const h = Math.floor(Math.sin(x * 0.2) * 2 + 5);
-                    for (let y = 0; y < h; y++) {
-                        const mat = (y === h - 1) ? mats[0] : (y > h - 3 ? mats[1] : mats[2]);
-                        const mesh = new THREE.Mesh(boxGeo, mat);
-                        mesh.position.set(x, y, z);
-                        scene.add(mesh);
-                        blocks.push(mesh);
-                    }
-                }
-            }
-        }
-        generateWorld();
-
-        // --- 5. PLAYER MOVEMENT ---
-        camera.position.set(0, 10, 10); // Start high to avoid spawning inside blocks
+        const WORLD_SIZE = 3000;
         const keys = {};
-        document.addEventListener('keydown', (e) => keys[e.code] = true);
-        document.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        document.body.addEventListener('click', () => document.body.requestPointerLock());
-
-        const raycaster = new THREE.Raycaster();
-        document.addEventListener('mousedown', (e) => {
-            if (document.pointerLockElement !== document.body) return;
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const intersects = raycaster.intersectObjects(blocks);
-            if (intersects.length > 0) {
-                const hit = intersects[0];
-                if (e.shiftKey) { // Build
-                    const b = new THREE.Mesh(boxGeo, mats[0]);
-                    b.position.copy(hit.object.position).add(hit.face.normal);
-                    scene.add(b); blocks.push(b);
-                } else { // Mine
-                    scene.remove(hit.object);
-                    blocks.splice(blocks.indexOf(hit.object), 1);
-                }
-            }
-        });
-
-        // --- 6. RENDER LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-            const speed = 0.1;
-            if (keys['KeyW']) camera.translateZ(-speed);
-            if (keys['KeyS']) camera.translateZ(speed);
-            if (keys['KeyA']) camera.translateX(-speed);
-            if (keys['KeyD']) camera.translateX(speed);
-            if (keys['Space']) camera.position.y += 0.1;
-            if (keys['ShiftLeft']) camera.position.y -= 0.1;
-
-            renderer.render(scene, camera);
+        function resize() {
+            c1.width = c2.width = window.innerWidth / 2;
+            c1.height = c2.height = window.innerHeight;
         }
-        animate();
+        window.onresize = resize;
+        resize();
 
-        window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        };
+        window.onkeydown = e => keys[e.code] = true;
+        window.onkeyup = e => keys[e.code] = false;
+
+        class Snake {
+            constructor(x, y, color, controls) {
+                this.x = x; this.y = y;
+                this.color = color;
+                this.controls = controls;
+                this.targetAngle = 0; // Current direction in radians
+                this.speed = 5;
+                this.radius = 12;
+                this.segments = Array(25).fill({x, y});
+                this.score = 0;
+            }
+
+            update() {
+                // Fixed Direction Controls
+                if (keys[this.controls.up]) this.targetAngle = -Math.PI / 2;
+                if (keys[this.controls.down]) this.targetAngle = Math.PI / 2;
+                if (keys[this.controls.left]) this.targetAngle = Math.PI;
+                if (keys[this.controls.right]) this.targetAngle = 0;
+
+                // Move head based on angle
+                this.x += Math.cos(this.targetAngle) * this.speed;
+                this.y += Math.sin(this.targetAngle) * this.speed;
+
+                // Simple World boundaries
+                this.x = Math.max(0, Math.min(WORLD_SIZE, this.x));
+                this.y = Math.max(0, Math.min(WORLD_SIZE, this.y));
+
+                // Trail logic: Add head, remove tail
+                this.segments.unshift({x: this.x, y: this.y});
+                const maxLength = 25 + Math.floor(this.score / 5);
+                if (this.segments.length > maxLength) this.segments.pop();
+            }
+
+            draw(ctx, camX, camY) {
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.radius * 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(this.segments[0].x - camX, this.segments[0].y - camY);
+                // Draw path through segments
+                for(let i=1; i < this.segments.length; i++) {
+                    ctx.lineTo(this.segments[i].x - camX, this.segments[i].y - camY);
+                }
+                ctx.stroke();
+
+                // Draw "Head" circle
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(this.x - camX, this.y - camY, this.radius * 0.6, 0, Math.PI*2);
+                ctx.fill();
+            }
+        }
+
+        const p1 = new Snake(500, 500, '#4CAF50', {up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD'});
+        const p2 = new Snake(1000, 1000, '#2196F3', {up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight'});
+        
+        let food = Array(150).fill(0).map(() => ({
+            x: Math.random() * WORLD_SIZE, 
+            y: Math.random() * WORLD_SIZE, 
+            r: Math.random() * 5 + 3,
+            c: `hsl(${Math.random()*360}, 100%, 60%)`
+        }));
+
+        function checkFood(player, scoreId) {
+            food.forEach((f, i) => {
+                if (Math.hypot(player.x - f.x, player.y - f.y) < player.radius + f.r) {
+                    player.score += 10;
+                    document.getElementById(scoreId).innerText = player.score;
+                    // Respawn food elsewhere
+                    food[i] = { x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, r: Math.random()*5+3, c: `hsl(${Math.random()*360}, 100%, 60%)` };
+                }
+            });
+        }
+
+        function renderView(ctx, player, canvas) {
+            // Camera follows player center
+            const camX = player.x - canvas.width / 2;
+            const camY = player.y - canvas.height / 2;
+
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Subtle Grid
+            ctx.strokeStyle = '#252525';
+            ctx.lineWidth = 2;
+            for(let x=0; x<=WORLD_SIZE; x+=100) {
+                ctx.beginPath(); ctx.moveTo(x-camX, 0-camY); ctx.lineTo(x-camX, WORLD_SIZE-camY); ctx.stroke();
+            }
+            for(let y=0; y<=WORLD_SIZE; y+=100) {
+                ctx.beginPath(); ctx.moveTo(0-camX, y-camY); ctx.lineTo(WORLD_SIZE-camX, y-camY); ctx.stroke();
+            }
+
+            // Draw All Food
+            food.forEach(f => {
+                ctx.fillStyle = f.c;
+                ctx.beginPath(); ctx.arc(f.x - camX, f.y - camY, f.r, 0, Math.PI*2); ctx.fill();
+            });
+
+            // Draw both snakes in this view
+            p1.draw(ctx, camX, camY);
+            p2.draw(ctx, camX, camY);
+        }
+
+        function loop() {
+            p1.update();
+            p2.update();
+            checkFood(p1, 'score1');
+            checkFood(p2, 'score2');
+
+            renderView(ctx1, p1, c1);
+            renderView(ctx2, p2, c2);
+
+            requestAnimationFrame(loop);
+        }
+
+        loop();
     </script>
 </body>
 </html>
