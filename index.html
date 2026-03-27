@@ -2,253 +2,268 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2-Player Same Screen Slither</title>
+    <title>3D Minecraft: Survival Edition</title>
     <style>
-        body {
-            background-color: #1a1a1a;
-            color: white;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow: hidden;
-        }
-        #game-container {
-            position: relative;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            border: 4px solid #444;
-            border-radius: 8px;
-        }
-        canvas {
-            display: block;
-            background-color: #050505;
-        }
-        .scoreboard {
-            display: flex;
-            justify-content: space-around;
-            width: 800px;
-            margin-bottom: 15px;
-            font-size: 24px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-        .p1-score { color: #ff4747; text-shadow: 0 0 10px #ff4747; }
-        .p2-score { color: #4747ff; text-shadow: 0 0 10px #4747ff; }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; background: #000; }
+        #crosshair { position: fixed; top: 50%; left: 50%; width: 15px; height: 15px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
         
-        #overlay {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-        }
-        h1 { font-size: 48px; margin-bottom: 10px; }
-        button {
-            padding: 12px 30px;
-            font-size: 20px;
-            background: #fff;
-            color: #000;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-        button:hover { background: #ccc; transform: scale(1.05); }
+        /* UI Panels */
+        #hud { position: fixed; bottom: 20px; left: 20px; color: #ff4d4d; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; pointer-events: none; }
+        #time-info { position: fixed; top: 10px; right: 20px; color: #fff; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+        #damage-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 50; }
+
+        /* Inventory & Crafting */
+        #inventory-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .window { background: #8b8b8b; border: 6px solid #444; padding: 20px; display: flex; gap: 30px; box-shadow: 10px 10px 0 #222; }
+        .grid { display: grid; gap: 4px; background: #555; padding: 5px; border: 3px solid #333; }
+        .slot { width: 55px; height: 55px; background: #8b8b8b; border: 3px solid #373737; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; font-size: 11px; color: #fff; text-shadow: 1px 1px #000; }
+        .slot:hover { background: #aaa; border-color: #eee; }
+        .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 5px; font-size: 16px; }
+        .result-slot { width: 65px; height: 65px; border: 4px solid #fff; background: #444; margin: 10px auto; }
+        h3 { margin: 0 0 10px 0; color: #fff; text-align: center; }
     </style>
 </head>
 <body>
 
-    <div class="scoreboard">
-        <div class="p1-score">P1 (WASD): <span id="s1">0</span></div>
-        <div class="p2-score">P2 (ARROWS): <span id="s2">0</span></div>
-    </div>
+    <div id="crosshair"></div>
+    <div id="damage-flash"></div>
+    <div id="hud">HEALTH: <span id="hp-val">20</span></div>
+    <div id="time-info">TIME: <span id="time-val">Day</span></div>
 
-    <div id="game-container">
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="overlay">
-            <h1 id="status-text">PLAYER 1 WINS!</h1>
-            <p>Don't hit walls, yourself, or each other.</p>
-            <button onclick="resetGame()">PLAY AGAIN</button>
+    <div id="inventory-screen">
+        <div class="window">
+            <div>
+                <h3>CRAFTING</h3>
+                <div id="craft-grid" class="grid" style="grid-template-columns: repeat(3, 55px);"></div>
+                <div id="craft-result" class="slot result-slot"></div>
+            </div>
+            <div>
+                <h3>BACKPACK</h3>
+                <div id="inv-grid" class="grid" style="grid-template-columns: repeat(4, 55px);"></div>
+                <p style="color:#eee; font-size: 12px; margin-top:10px;">Click items to move to grid</p>
+            </div>
         </div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const s1Elem = document.getElementById('s1');
-        const s2Elem = document.getElementById('s2');
-        const overlay = document.getElementById('overlay');
-        const statusText = document.getElementById('status-text');
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com" } }
+    </script>
 
-        const GRID = 20;
-        const COLS = canvas.width / GRID;
-        const ROWS = canvas.height / GRID;
+    <script type="module">
+        import * as THREE from 'three';
 
-        let food, p1, p2, gameRunning;
+        // --- AUDIO ENGINE ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(freq, type, duration) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + duration);
+        }
 
-        class Snake {
-            constructor(x, y, color, isP1) {
-                this.spawnPos = {x, y};
-                this.color = color;
-                this.isP1 = isP1;
-                this.init();
+        // --- RENDERER SETUP ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambient);
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        scene.add(sun);
+
+        // --- GAME DATA ---
+        const blocks = [], mobs = [];
+        let inventory = { wood: 5, stone: 0, iron: 0, diamond: 0, stick: 0 };
+        let craftingGrid = Array(9).fill(null);
+        let player = { hp: 20, isPaused: false, velocityY: 0 };
+        let gameTime = 0, isDay = true;
+        const keys = {};
+
+        const mats = {
+            grass: new THREE.MeshLambertMaterial({ color: 0x4caf50 }),
+            stone: new THREE.MeshLambertMaterial({ color: 0x808080 }),
+            wood: new THREE.MeshLambertMaterial({ color: 0x5d4037 }),
+            iron: new THREE.MeshLambertMaterial({ color: 0xdcdcdc }),
+            diamond: new THREE.MeshLambertMaterial({ color: 0x00ffff }),
+            zombie: new THREE.MeshLambertMaterial({ color: 0x2e7d32 })
+        };
+        const geo = new THREE.BoxGeometry(1, 1, 1);
+
+        // --- WORLD GEN ---
+        for (let x = -15; x < 15; x++) {
+            for (let z = -15; z < 15; z++) {
+                let type = 'grass';
+                if (Math.random() > 0.85) type = 'stone';
+                if (Math.random() > 0.97) type = 'iron';
+                if (Math.random() > 0.99) type = 'diamond';
+                const b = new THREE.Mesh(geo, mats[type]);
+                b.position.set(x, 0, z);
+                b.userData.type = type;
+                scene.add(b);
+                blocks.push(b);
             }
+        }
 
-            init() {
-                this.body = [
-                    {x: this.spawnPos.x, y: this.spawnPos.y},
-                    {x: this.spawnPos.x - (this.isP1 ? 1 : -1), y: this.spawnPos.y},
-                    {x: this.spawnPos.x - (this.isP1 ? 2 : -2), y: this.spawnPos.y}
-                ];
-                this.dir = { x: this.isP1 ? 1 : -1, y: 0 };
-                this.nextDir = { x: this.isP1 ? 1 : -1, y: 0 };
-                this.score = 0;
-                this.alive = true;
+        // --- MOB CLASS ---
+        class Zombie {
+            constructor(x, z) {
+                this.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.8, 0.7), mats.zombie.clone());
+                this.mesh.position.set(x, 1.4, z);
+                this.mesh.userData = { type: 'mob', hp: 6 };
+                scene.add(this.mesh);
+                this.dir = new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
             }
-
             update() {
-                if (!this.alive) return;
-                this.dir = this.nextDir;
-                const head = { x: this.body[0].x + this.dir.x, y: this.body[0].y + this.dir.y };
+                this.mesh.position.addScaledVector(this.dir, 0.025);
+                if(Math.random() > 0.98) this.dir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
                 
-                this.body.unshift(head);
-                if (head.x === food.x && head.y === food.y) {
-                    this.score++;
-                    spawnFood();
+                // Damage player on touch
+                if(this.mesh.position.distanceTo(camera.position) < 1.2) {
+                    damagePlayer(1);
+                    this.dir.negate();
+                }
+
+                if (isDay) { // Burning
+                    this.mesh.userData.hp -= 0.02;
+                    this.mesh.material.emissive.setHex(0xff5500);
                 } else {
-                    this.body.pop();
+                    this.mesh.material.emissive.setHex(0x000000);
                 }
-            }
-
-            checkCollisions(other) {
-                if (!this.alive) return;
-                const head = this.body[0];
-
-                // 1. Wall Collision
-                if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
-                    this.alive = false;
-                }
-
-                // 2. Self Collision
-                for (let i = 1; i < this.body.length; i++) {
-                    if (head.x === this.body[i].x && head.y === this.body[i].y) this.alive = false;
-                }
-
-                // 3. Other Player Body Collision
-                other.body.forEach(seg => {
-                    if (head.x === seg.x && head.y === seg.y) this.alive = false;
-                });
-            }
-
-            draw() {
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = this.alive ? this.color : '#555';
-                ctx.fillStyle = this.alive ? this.color : '#555';
-                
-                this.body.forEach((seg, index) => {
-                    // Make head slightly different
-                    if (index === 0) ctx.globalAlpha = 1.0;
-                    else ctx.globalAlpha = 0.8;
-                    
-                    ctx.fillRect(seg.x * GRID, seg.y * GRID, GRID - 2, GRID - 2);
-                });
-                ctx.globalAlpha = 1.0;
-                ctx.shadowBlur = 0;
+                return this.mesh.userData.hp > 0;
             }
         }
 
-        function spawnFood() {
-            food = { 
-                x: Math.floor(Math.random() * (COLS - 2)) + 1, 
-                y: Math.floor(Math.random() * (ROWS - 2)) + 1 
-            };
+        // --- LOGIC FUNCTIONS ---
+        function damagePlayer(amount) {
+            player.hp -= amount;
+            document.getElementById('hp-val').innerText = Math.ceil(player.hp);
+            document.getElementById('damage-flash').style.display = 'block';
+            playSound(150, 'sawtooth', 0.1);
+            setTimeout(() => document.getElementById('damage-flash').style.display = 'none', 100);
+            if(player.hp <= 0) alert("GAME OVER! Reload to restart.");
         }
 
-        function resetGame() {
-            if (!p1) {
-                p1 = new Snake(10, 15, '#ff4747', true);
-                p2 = new Snake(30, 15, '#4747ff', false);
-            } else {
-                p1.init();
-                p2.init();
+        function toggleInventory() {
+            player.isPaused = !player.isPaused;
+            document.getElementById('inventory-screen').style.display = player.isPaused ? 'flex' : 'none';
+            if (player.isPaused) { document.exitPointerLock(); renderUI(); }
+            else { renderer.domElement.requestPointerLock(); }
+        }
+
+        // --- MOUSE & INPUT ---
+        const raycaster = new THREE.Raycaster();
+        document.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyE') toggleInventory(); });
+        document.addEventListener('keyup', e => keys[e.code] = false);
+        renderer.domElement.addEventListener('mousedown', e => {
+            if (player.isPaused || document.pointerLockElement !== renderer.domElement) return;
+            raycaster.setFromCamera({x:0, y:0}, camera);
+
+            const mobHits = raycaster.intersectObjects(mobs.map(m => m.mesh));
+            if (mobHits.length > 0) {
+                const m = mobHits[0].object;
+                m.userData.hp -= 2;
+                m.material.emissive.setHex(0xff0000);
+                playSound(400, 'square', 0.05);
+                setTimeout(() => m.material.emissive.setHex(0x000000), 100);
+                return;
             }
-            spawnFood();
-            gameRunning = true;
-            overlay.style.display = 'none';
-        }
 
-        window.addEventListener('keydown', e => {
-            // P1: WASD (Prevents 180 turns)
-            if (e.code === 'KeyW' && p1.dir.y === 0) p1.nextDir = { x: 0, y: -1 };
-            if (e.code === 'KeyS' && p1.dir.y === 0) p1.nextDir = { x: 0, y: 1 };
-            if (e.code === 'KeyA' && p1.dir.x === 0) p1.nextDir = { x: -1, y: 0 };
-            if (e.code === 'KeyD' && p1.dir.x === 0) p1.nextDir = { x: 1, y: 0 };
-
-            // P2: Arrows (Prevents 180 turns)
-            if (e.code === 'ArrowUp' && p2.dir.y === 0) p2.nextDir = { x: 0, y: -1 };
-            if (e.code === 'ArrowDown' && p2.dir.y === 0) p2.nextDir = { x: 0, y: 1 };
-            if (e.code === 'ArrowLeft' && p2.dir.x === 0) p2.nextDir = { x: -1, y: 0 };
-            if (e.code === 'ArrowRight' && p2.dir.x === 0) p2.nextDir = { x: 1, y: 0 };
+            const blockHits = raycaster.intersectObjects(blocks);
+            if (blockHits.length > 0) {
+                const b = blockHits[0].object;
+                if (e.button === 0) { // Mine
+                    inventory[b.userData.type]++;
+                    scene.remove(b);
+                    blocks.splice(blocks.indexOf(b), 1);
+                    playSound(200, 'sine', 0.05);
+                } else if (e.button === 2) { // Place
+                    const pos = b.position.clone().add(blockHits[0].face.normal);
+                    const nb = new THREE.Mesh(geo, mats.grass);
+                    nb.position.copy(pos); nb.userData.type = 'grass';
+                    scene.add(nb); blocks.push(nb);
+                }
+            }
         });
+        document.addEventListener('contextmenu', e => e.preventDefault());
 
-        function gameLoop() {
-            if (gameRunning) {
-                p1.update();
-                p2.update();
-                
-                // Cross-check collisions
-                p1.checkCollisions(p2);
-                p2.checkCollisions(p1);
+        // --- UI & CRAFTING ---
+        function renderUI() {
+            const inv = document.getElementById('inv-grid');
+            inv.innerHTML = '';
+            Object.keys(inventory).forEach(item => {
+                if(inventory[item] <= 0) return;
+                const s = document.createElement('div');
+                s.className = 'slot'; s.innerText = item; s.setAttribute('data-count', inventory[item]);
+                s.onclick = () => {
+                    const empty = craftingGrid.indexOf(null);
+                    if(empty !== -1) { craftingGrid[empty] = item; inventory[item]--; renderUI(); }
+                };
+                inv.appendChild(s);
+            });
 
-                if (!p1.alive || !p2.alive) {
-                    gameRunning = false;
-                    overlay.style.display = 'flex';
-                    if (!p1.alive && !p2.alive) statusText.innerText = "DRAW! BOTH DIED";
-                    else if (!p1.alive) statusText.innerText = "PLAYER 2 WINS!";
-                    else statusText.innerText = "PLAYER 1 WINS!";
-                }
-
-                s1Elem.innerText = p1.score;
-                s2Elem.innerText = p2.score;
-            }
-
-            // Draw Background
-            ctx.fillStyle = '#050505';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Grid Lines (Subtle)
-            ctx.strokeStyle = '#111';
-            ctx.lineWidth = 1;
-            for(let i=0; i<canvas.width; i+=GRID) {
-                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
-            }
-            for(let i=0; i<canvas.height; i+=GRID) {
-                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width, i); ctx.stroke();
-            }
-
-            // Draw Food
-            ctx.fillStyle = '#00ff44';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00ff44';
-            ctx.fillRect(food.x * GRID, food.y * GRID, GRID - 2, GRID - 2);
-            ctx.shadowBlur = 0;
-
-            p1.draw();
-            p2.draw();
-
-            setTimeout(() => requestAnimationFrame(gameLoop), 100);
+            const craft = document.getElementById('craft-grid');
+            craft.innerHTML = '';
+            craftingGrid.forEach((item, i) => {
+                const s = document.createElement('div');
+                s.className = 'slot'; s.innerText = item || "";
+                s.onclick = () => { if(item) { inventory[item]++; craftingGrid[i] = null; renderUI(); } };
+                craft.appendChild(s);
+            });
+            
+            const g = craftingGrid; let res = null;
+            if(g[0]==='wood' && g[3]==='wood') res = {type:'stick', n:4};
+            if(g[0] && g[0]===g[1] && g[1]===g[2] && g[4]==='stick' && g[7]==='stick') res = {type: g[0]+'_pickaxe', n:1};
+            
+            const rSlot = document.getElementById('craft-result');
+            rSlot.innerText = res ? res.type : "";
+            rSlot.onclick = () => { if(res) { inventory[res.type] = (inventory[res.type] || 0) + res.n; craftingGrid.fill(null); playSound(600, 'sine', 0.2); renderUI(); } };
         }
 
-        resetGame();
-        gameLoop();
+        // --- MAIN LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Cycle Time
+            gameTime += 0.002;
+            isDay = Math.sin(gameTime) > 0;
+            scene.background = new THREE.Color().setHSL(0.6, 0.5, Math.max(0.05, Math.sin(gameTime) * 0.5 + 0.5));
+            sun.intensity = Math.max(0, Math.sin(gameTime));
+            document.getElementById('time-val').innerText = isDay ? "Day" : "Night";
+
+            if (mobs.length < 8 && Math.random() > 0.99) mobs.push(new Zombie(Math.random()*40-20, Math.random()*40-20));
+
+            if (!player.isPaused && document.pointerLockElement === renderer.domElement) {
+                const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+                const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
+
+                if (keys['KeyW']) camera.position.addScaledVector(dir, 0.12);
+                if (keys['KeyS']) camera.position.addScaledVector(dir, -0.12);
+                if (keys['KeyA']) camera.position.addScaledVector(side, 0.12);
+                if (keys['KeyD']) camera.position.addScaledVector(side, -0.12);
+
+                player.velocityY -= 0.01;
+                camera.position.y += player.velocityY;
+                if(camera.position.y < 2) { camera.position.y = 2; player.velocityY = 0; }
+                if(keys['Space'] && camera.position.y <= 2.1) player.velocityY = 0.18;
+
+                for(let i = mobs.length - 1; i >= 0; i--) {
+                    if (!mobs[i].update()) { scene.remove(mobs[i].mesh); mobs.splice(i, 1); }
+                }
+            }
+            camera.rotation.order = 'YXZ';
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+        renderer.domElement.addEventListener('click', () => { if(!player.isPaused) { renderer.domElement.requestPointerLock(); audioCtx.resume(); } });
+        
+        animate();
     </script>
 </body>
 </html>
