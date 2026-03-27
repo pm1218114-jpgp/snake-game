@@ -2,28 +2,30 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>3D Minecraft: Survival Edition</title>
+    <title>3D Minecraft Survival - FIXED</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; background: #000; }
+        body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #000; }
         #crosshair { position: fixed; top: 50%; left: 50%; width: 15px; height: 15px; border: 2px solid white; transform: translate(-50%, -50%); pointer-events: none; z-index: 10; }
-        
-        /* UI Panels */
         #hud { position: fixed; bottom: 20px; left: 20px; color: #ff4d4d; font-size: 24px; font-weight: bold; text-shadow: 2px 2px #000; pointer-events: none; }
         #time-info { position: fixed; top: 10px; right: 20px; color: #fff; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
         #damage-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,0,0,0.3); display: none; pointer-events: none; z-index: 50; }
-
-        /* Inventory & Crafting */
         #inventory-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 100; }
-        .window { background: #8b8b8b; border: 6px solid #444; padding: 20px; display: flex; gap: 30px; box-shadow: 10px 10px 0 #222; }
+        .window { background: #8b8b8b; border: 6px solid #444; padding: 20px; display: flex; gap: 30px; }
         .grid { display: grid; gap: 4px; background: #555; padding: 5px; border: 3px solid #333; }
         .slot { width: 55px; height: 55px; background: #8b8b8b; border: 3px solid #373737; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; font-size: 11px; color: #fff; text-shadow: 1px 1px #000; }
-        .slot:hover { background: #aaa; border-color: #eee; }
+        .slot:hover { background: #aaa; }
         .slot::after { content: attr(data-count); position: absolute; bottom: 2px; right: 5px; font-size: 16px; }
         .result-slot { width: 65px; height: 65px; border: 4px solid #fff; background: #444; margin: 10px auto; }
-        h3 { margin: 0 0 10px 0; color: #fff; text-align: center; }
+        #click-to-start { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 200; cursor: pointer; }
     </style>
 </head>
 <body>
+
+    <div id="click-to-start">
+        <h1>3D MINECRAFT</h1>
+        <p>CLICK ANYWHERE TO START</p>
+        <p style="font-size: 14px;">WASD: Move | E: Inventory | Left-Click: Mine/Attack</p>
+    </div>
 
     <div id="crosshair"></div>
     <div id="damage-flash"></div>
@@ -40,21 +42,17 @@
             <div>
                 <h3>BACKPACK</h3>
                 <div id="inv-grid" class="grid" style="grid-template-columns: repeat(4, 55px);"></div>
-                <p style="color:#eee; font-size: 12px; margin-top:10px;">Click items to move to grid</p>
             </div>
         </div>
     </div>
 
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com" } }
-    </script>
-
     <script type="module">
-        import * as THREE from 'three';
+        import * as THREE from 'https://cdnjs.cloudflare.com';
 
         // --- AUDIO ENGINE ---
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let audioCtx;
         function playSound(freq, type, duration) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
             osc.type = type;
@@ -67,21 +65,23 @@
 
         // --- RENDERER SETUP ---
         const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb);
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambient);
-        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+        sun.position.set(10, 20, 10);
         scene.add(sun);
 
         // --- GAME DATA ---
         const blocks = [], mobs = [];
         let inventory = { wood: 5, stone: 0, iron: 0, diamond: 0, stick: 0 };
         let craftingGrid = Array(9).fill(null);
-        let player = { hp: 20, isPaused: false, velocityY: 0 };
+        let player = { hp: 20, isPaused: false, velocityY: 0, started: false };
         let gameTime = 0, isDay = true;
         const keys = {};
 
@@ -101,7 +101,6 @@
                 let type = 'grass';
                 if (Math.random() > 0.85) type = 'stone';
                 if (Math.random() > 0.97) type = 'iron';
-                if (Math.random() > 0.99) type = 'diamond';
                 const b = new THREE.Mesh(geo, mats[type]);
                 b.position.set(x, 0, z);
                 b.userData.type = type;
@@ -110,87 +109,72 @@
             }
         }
 
-        // --- MOB CLASS ---
+        // --- ZOMBIE CLASS ---
         class Zombie {
             constructor(x, z) {
                 this.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.8, 0.7), mats.zombie.clone());
                 this.mesh.position.set(x, 1.4, z);
-                this.mesh.userData = { type: 'mob', hp: 6 };
+                this.mesh.userData = { hp: 6 };
                 scene.add(this.mesh);
                 this.dir = new THREE.Vector3(Math.random()-0.5, 0, Math.random()-0.5).normalize();
             }
             update() {
                 this.mesh.position.addScaledVector(this.dir, 0.025);
-                if(Math.random() > 0.98) this.dir.set(Math.random()-0.5, 0, Math.random()-0.5).normalize();
-                
-                // Damage player on touch
-                if(this.mesh.position.distanceTo(camera.position) < 1.2) {
-                    damagePlayer(1);
-                    this.dir.negate();
-                }
-
-                if (isDay) { // Burning
-                    this.mesh.userData.hp -= 0.02;
-                    this.mesh.material.emissive.setHex(0xff5500);
-                } else {
-                    this.mesh.material.emissive.setHex(0x000000);
-                }
+                if(this.mesh.position.distanceTo(camera.position) < 1.2) damagePlayer(0.1);
+                if(isDay) { this.mesh.userData.hp -= 0.01; this.mesh.material.emissive.setHex(0xff5500); }
+                else { this.mesh.material.emissive.setHex(0x000000); }
                 return this.mesh.userData.hp > 0;
             }
         }
 
-        // --- LOGIC FUNCTIONS ---
-        function damagePlayer(amount) {
-            player.hp -= amount;
+        function damagePlayer(amt) {
+            player.hp -= amt;
             document.getElementById('hp-val').innerText = Math.ceil(player.hp);
-            document.getElementById('damage-flash').style.display = 'block';
-            playSound(150, 'sawtooth', 0.1);
-            setTimeout(() => document.getElementById('damage-flash').style.display = 'none', 100);
-            if(player.hp <= 0) alert("GAME OVER! Reload to restart.");
+            if(Math.random() > 0.95) {
+                document.getElementById('damage-flash').style.display = 'block';
+                setTimeout(() => document.getElementById('damage-flash').style.display = 'none', 50);
+            }
         }
+
+        // --- INPUTS ---
+        document.getElementById('click-to-start').onclick = () => {
+            player.started = true;
+            document.getElementById('click-to-start').style.display = 'none';
+            renderer.domElement.requestPointerLock();
+            if (audioCtx) audioCtx.resume();
+        };
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if(e.code === 'KeyE' && player.started) toggleInventory();
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
 
         function toggleInventory() {
             player.isPaused = !player.isPaused;
             document.getElementById('inventory-screen').style.display = player.isPaused ? 'flex' : 'none';
-            if (player.isPaused) { document.exitPointerLock(); renderUI(); }
-            else { renderer.domElement.requestPointerLock(); }
+            if (player.isPaused) document.exitPointerLock();
+            else renderer.domElement.requestPointerLock();
+            renderUI();
         }
 
-        // --- MOUSE & INPUT ---
-        const raycaster = new THREE.Raycaster();
-        document.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyE') toggleInventory(); });
-        document.addEventListener('keyup', e => keys[e.code] = false);
         renderer.domElement.addEventListener('mousedown', e => {
-            if (player.isPaused || document.pointerLockElement !== renderer.domElement) return;
+            if (player.isPaused || !player.started) return;
             raycaster.setFromCamera({x:0, y:0}, camera);
-
-            const mobHits = raycaster.intersectObjects(mobs.map(m => m.mesh));
-            if (mobHits.length > 0) {
-                const m = mobHits[0].object;
-                m.userData.hp -= 2;
-                m.material.emissive.setHex(0xff0000);
-                playSound(400, 'square', 0.05);
-                setTimeout(() => m.material.emissive.setHex(0x000000), 100);
-                return;
-            }
-
             const blockHits = raycaster.intersectObjects(blocks);
             if (blockHits.length > 0) {
                 const b = blockHits[0].object;
-                if (e.button === 0) { // Mine
+                if (e.button === 0) {
                     inventory[b.userData.type]++;
                     scene.remove(b);
                     blocks.splice(blocks.indexOf(b), 1);
                     playSound(200, 'sine', 0.05);
-                } else if (e.button === 2) { // Place
-                    const pos = b.position.clone().add(blockHits[0].face.normal);
-                    const nb = new THREE.Mesh(geo, mats.grass);
-                    nb.position.copy(pos); nb.userData.type = 'grass';
-                    scene.add(nb); blocks.push(nb);
                 }
             }
         });
-        document.addEventListener('contextmenu', e => e.preventDefault());
+
+        const raycaster = new THREE.Raycaster();
+        camera.position.set(0, 2, 5);
 
         // --- UI & CRAFTING ---
         function renderUI() {
@@ -201,12 +185,11 @@
                 const s = document.createElement('div');
                 s.className = 'slot'; s.innerText = item; s.setAttribute('data-count', inventory[item]);
                 s.onclick = () => {
-                    const empty = craftingGrid.indexOf(null);
-                    if(empty !== -1) { craftingGrid[empty] = item; inventory[item]--; renderUI(); }
+                    const idx = craftingGrid.indexOf(null);
+                    if(idx !== -1) { craftingGrid[idx] = item; inventory[item]--; renderUI(); }
                 };
                 inv.appendChild(s);
             });
-
             const craft = document.getElementById('craft-grid');
             craft.innerHTML = '';
             craftingGrid.forEach((item, i) => {
@@ -215,54 +198,55 @@
                 s.onclick = () => { if(item) { inventory[item]++; craftingGrid[i] = null; renderUI(); } };
                 craft.appendChild(s);
             });
-            
-            const g = craftingGrid; let res = null;
-            if(g[0]==='wood' && g[3]==='wood') res = {type:'stick', n:4};
-            if(g[0] && g[0]===g[1] && g[1]===g[2] && g[4]==='stick' && g[7]==='stick') res = {type: g[0]+'_pickaxe', n:1};
-            
-            const rSlot = document.getElementById('craft-result');
-            rSlot.innerText = res ? res.type : "";
-            rSlot.onclick = () => { if(res) { inventory[res.type] = (inventory[res.type] || 0) + res.n; craftingGrid.fill(null); playSound(600, 'sine', 0.2); renderUI(); } };
+            // Recipe: 2 Wood (anywhere) = 4 Sticks
+            const g = craftingGrid.filter(x => x !== null);
+            let res = (g.length === 2 && g[0] === 'wood' && g[1] === 'wood') ? {type:'stick', n:4} : null;
+            const rs = document.getElementById('craft-result');
+            rs.innerText = res ? res.type : "";
+            rs.onclick = () => { if(res) { inventory[res.type] += res.n; craftingGrid.fill(null); renderUI(); } };
         }
 
-        // --- MAIN LOOP ---
+        // --- LOOP ---
         function animate() {
             requestAnimationFrame(animate);
+            if (player.started && !player.isPaused) {
+                gameTime += 0.002;
+                isDay = Math.sin(gameTime) > 0;
+                scene.background = new THREE.Color().setHSL(0.6, 0.5, Math.max(0.05, Math.sin(gameTime) * 0.5 + 0.5));
+                document.getElementById('time-val').innerText = isDay ? "Day" : "Night";
 
-            // Cycle Time
-            gameTime += 0.002;
-            isDay = Math.sin(gameTime) > 0;
-            scene.background = new THREE.Color().setHSL(0.6, 0.5, Math.max(0.05, Math.sin(gameTime) * 0.5 + 0.5));
-            sun.intensity = Math.max(0, Math.sin(gameTime));
-            document.getElementById('time-val').innerText = isDay ? "Day" : "Night";
+                if (mobs.length < 5 && Math.random() > 0.99) mobs.push(new Zombie(Math.random()*20-10, Math.random()*20-10));
 
-            if (mobs.length < 8 && Math.random() > 0.99) mobs.push(new Zombie(Math.random()*40-20, Math.random()*40-20));
-
-            if (!player.isPaused && document.pointerLockElement === renderer.domElement) {
                 const dir = new THREE.Vector3(); camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
                 const side = new THREE.Vector3().crossVectors(camera.up, dir).normalize();
-
-                if (keys['KeyW']) camera.position.addScaledVector(dir, 0.12);
-                if (keys['KeyS']) camera.position.addScaledVector(dir, -0.12);
-                if (keys['KeyA']) camera.position.addScaledVector(side, 0.12);
-                if (keys['KeyD']) camera.position.addScaledVector(side, -0.12);
+                if (keys['KeyW']) camera.position.addScaledVector(dir, 0.1);
+                if (keys['KeyS']) camera.position.addScaledVector(dir, -0.1);
+                if (keys['KeyA']) camera.position.addScaledVector(side, 0.1);
+                if (keys['KeyD']) camera.position.addScaledVector(side, -0.1);
 
                 player.velocityY -= 0.01;
                 camera.position.y += player.velocityY;
                 if(camera.position.y < 2) { camera.position.y = 2; player.velocityY = 0; }
-                if(keys['Space'] && camera.position.y <= 2.1) player.velocityY = 0.18;
+                if(keys['Space'] && camera.position.y <= 2) player.velocityY = 0.15;
 
                 for(let i = mobs.length - 1; i >= 0; i--) {
                     if (!mobs[i].update()) { scene.remove(mobs[i].mesh); mobs.splice(i, 1); }
                 }
             }
-            camera.rotation.order = 'YXZ';
+            if (document.pointerLockElement === renderer.domElement) {
+                camera.rotation.order = 'YXZ';
+            }
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
-        renderer.domElement.addEventListener('click', () => { if(!player.isPaused) { renderer.domElement.requestPointerLock(); audioCtx.resume(); } });
-        
+        window.addEventListener('mousemove', e => {
+            if (document.pointerLockElement === renderer.domElement && !player.isPaused) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        });
+
         animate();
     </script>
 </body>
