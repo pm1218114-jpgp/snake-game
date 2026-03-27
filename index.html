@@ -2,175 +2,253 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Fixed Split-Screen Slither</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2-Player Same Screen Slither</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        .container { display: flex; width: 100vw; height: 100vh; }
-        .viewport { position: relative; width: 50%; height: 100%; border-right: 3px solid #333; overflow: hidden; }
-        canvas { display: block; background: #111; width: 100%; height: 100%; }
-        .ui { position: absolute; top: 15px; left: 15px; color: white; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; border: 1px solid #444; pointer-events: none; z-index: 10; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; justify-content: center; align-items: center; z-index: 100; color: white; flex-direction: column; text-align: center; }
-        button { padding: 20px 40px; font-size: 24px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 10px; margin-top: 20px; font-weight: bold; }
-        button:active { transform: scale(0.95); }
+        body {
+            background-color: #1a1a1a;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            border: 4px solid #444;
+            border-radius: 8px;
+        }
+        canvas {
+            display: block;
+            background-color: #050505;
+        }
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            width: 800px;
+            margin-bottom: 15px;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .p1-score { color: #ff4747; text-shadow: 0 0 10px #ff4747; }
+        .p2-score { color: #4747ff; text-shadow: 0 0 10px #4747ff; }
+        
+        #overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        h1 { font-size: 48px; margin-bottom: 10px; }
+        button {
+            padding: 12px 30px;
+            font-size: 20px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        button:hover { background: #ccc; transform: scale(1.05); }
     </style>
 </head>
 <body>
-    <div id="overlay">
-        <h1>Fixed Multiplayer Slither</h1>
-        <p>Player 1 (Left): <b>WASD</b> | Player 2 (Right): <b>Arrow Keys</b></p>
-        <button onclick="startGame()">CLICK TO START</button>
+
+    <div class="scoreboard">
+        <div class="p1-score">P1 (WASD): <span id="s1">0</span></div>
+        <div class="p2-score">P2 (ARROWS): <span id="s2">0</span></div>
     </div>
 
-    <div class="container">
-        <div class="viewport">
-            <div class="ui">P1 Score: <span id="score1">0</span></div>
-            <canvas id="canvas1"></canvas>
-        </div>
-        <div class="viewport">
-            <div class="ui">P2 Score: <span id="score2">0</span></div>
-            <canvas id="canvas2"></canvas>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="overlay">
+            <h1 id="status-text">PLAYER 1 WINS!</h1>
+            <p>Don't hit walls, yourself, or each other.</p>
+            <button onclick="resetGame()">PLAY AGAIN</button>
         </div>
     </div>
 
     <script>
-        const c1 = document.getElementById('canvas1');
-        const c2 = document.getElementById('canvas2');
-        const ctx1 = c1.getContext('2d');
-        const ctx2 = c2.getContext('2d');
-        const WORLD_SIZE = 2500;
-        let gameRunning = false;
-        const keys = {};
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const s1Elem = document.getElementById('s1');
+        const s2Elem = document.getElementById('s2');
+        const overlay = document.getElementById('overlay');
+        const statusText = document.getElementById('status-text');
 
-        function startGame() {
-            document.getElementById('overlay').style.display = 'none';
-            gameRunning = true;
-            resize();
-            loop();
-        }
+        const GRID = 20;
+        const COLS = canvas.width / GRID;
+        const ROWS = canvas.height / GRID;
 
-        function resize() {
-            c1.width = window.innerWidth / 2;
-            c1.height = window.innerHeight;
-            c2.width = window.innerWidth / 2;
-            c2.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","KeyW","KeyS","KeyA","KeyD"].includes(e.code)) e.preventDefault();
-        });
-        window.addEventListener('keyup', e => keys[e.code] = false);
+        let food, p1, p2, gameRunning;
 
         class Snake {
-            constructor(x, y, color, controls, id) {
-                this.startX = x; this.startY = y;
+            constructor(x, y, color, isP1) {
+                this.spawnPos = {x, y};
                 this.color = color;
-                this.controls = controls;
-                this.id = id;
-                this.reset();
+                this.isP1 = isP1;
+                this.init();
             }
-            reset() {
-                this.x = this.startX;
-                this.y = this.startY;
-                this.angle = (this.id === 1) ? 0 : Math.PI;
+
+            init() {
+                this.body = [
+                    {x: this.spawnPos.x, y: this.spawnPos.y},
+                    {x: this.spawnPos.x - (this.isP1 ? 1 : -1), y: this.spawnPos.y},
+                    {x: this.spawnPos.x - (this.isP1 ? 2 : -2), y: this.spawnPos.y}
+                ];
+                this.dir = { x: this.isP1 ? 1 : -1, y: 0 };
+                this.nextDir = { x: this.isP1 ? 1 : -1, y: 0 };
                 this.score = 0;
-                this.radius = 12;
-                this.segments = [];
-                for(let i=0; i<30; i++) this.segments.push({x: this.x, y: this.y});
-                const scoreSpan = document.getElementById('score' + this.id);
-                if(scoreSpan) scoreSpan.innerText = "0";
+                this.alive = true;
             }
+
             update() {
-                if (keys[this.controls.up]) this.angle = -Math.PI / 2;
-                else if (keys[this.controls.down]) this.angle = Math.PI / 2;
-                else if (keys[this.controls.left]) this.angle = Math.PI;
-                else if (keys[this.controls.right]) this.angle = 0;
-
-                this.x += Math.cos(this.angle) * 5;
-                this.y += Math.sin(this.angle) * 5;
-
-                // Death: Boundary
-                if (this.x < 0 || this.x > WORLD_SIZE || this.y < 0 || this.y > WORLD_SIZE) this.reset();
-
-                // Move segments
-                this.segments.unshift({x: this.x, y: this.y});
-                const maxLength = 30 + Math.floor(this.score / 5);
-                while (this.segments.length > maxLength) this.segments.pop();
-            }
-            draw(ctx, cx, cy) {
-                ctx.strokeStyle = this.color;
-                ctx.lineWidth = this.radius * 2;
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.beginPath();
-                ctx.moveTo(this.segments[0].x - cx, this.segments[0].y - cy);
-                for(let i=1; i<this.segments.length; i++) {
-                    ctx.lineTo(this.segments[i].x - cx, this.segments[i].y - cy);
-                }
-                ctx.stroke();
-
-                // Head Eye
-                ctx.fillStyle = 'white';
-                ctx.beginPath();
-                ctx.arc(this.x - cx, this.y - cy, this.radius * 0.6, 0, Math.PI*2);
-                ctx.fill();
-            }
-        }
-
-        const p1 = new Snake(400, 1250, '#4CAF50', {up:'KeyW', down:'KeyS', left:'KeyA', right:'KeyD'}, 1);
-        const p2 = new Snake(2100, 1250, '#2196F3', {up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight'}, 2);
-        let food = Array(150).fill(0).map(() => ({
-            x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, r: 5, c: 'yellow'
-        }));
-
-        function loop() {
-            if (!gameRunning) return;
-            p1.update(); p2.update();
-
-            // Food collision
-            [p1, p2].forEach(p => {
-                food.forEach((f, i) => {
-                    if(Math.hypot(p.x - f.x, p.y - f.y) < p.radius + f.r) {
-                        p.score += 10;
-                        document.getElementById('score'+p.id).innerText = p.score;
-                        food[i] = {x: Math.random()*WORLD_SIZE, y: Math.random()*WORLD_SIZE, r:5, c:'yellow'};
-                    }
-                });
+                if (!this.alive) return;
+                this.dir = this.nextDir;
+                const head = { x: this.body[0].x + this.dir.x, y: this.body[0].y + this.dir.y };
                 
-                // Death: Other Snake Body
-                const other = (p === p1) ? p2 : p1;
-                other.segments.forEach(seg => {
-                    if(Math.hypot(p.x - seg.x, p.y - seg.y) < p.radius) p.reset();
-                });
-            });
+                this.body.unshift(head);
+                if (head.x === food.x && head.y === food.y) {
+                    this.score++;
+                    spawnFood();
+                } else {
+                    this.body.pop();
+                }
+            }
 
-            render(ctx1, p1);
-            render(ctx2, p2);
-            requestAnimationFrame(loop);
+            checkCollisions(other) {
+                if (!this.alive) return;
+                const head = this.body[0];
+
+                // 1. Wall Collision
+                if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS) {
+                    this.alive = false;
+                }
+
+                // 2. Self Collision
+                for (let i = 1; i < this.body.length; i++) {
+                    if (head.x === this.body[i].x && head.y === this.body[i].y) this.alive = false;
+                }
+
+                // 3. Other Player Body Collision
+                other.body.forEach(seg => {
+                    if (head.x === seg.x && head.y === seg.y) this.alive = false;
+                });
+            }
+
+            draw() {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = this.alive ? this.color : '#555';
+                ctx.fillStyle = this.alive ? this.color : '#555';
+                
+                this.body.forEach((seg, index) => {
+                    // Make head slightly different
+                    if (index === 0) ctx.globalAlpha = 1.0;
+                    else ctx.globalAlpha = 0.8;
+                    
+                    ctx.fillRect(seg.x * GRID, seg.y * GRID, GRID - 2, GRID - 2);
+                });
+                ctx.globalAlpha = 1.0;
+                ctx.shadowBlur = 0;
+            }
         }
 
-        function render(ctx, activePlayer) {
-            const canvas = ctx.canvas;
-            const cx = activePlayer.x - canvas.width/2;
-            const cy = activePlayer.y - canvas.height/2;
+        function spawnFood() {
+            food = { 
+                x: Math.floor(Math.random() * (COLS - 2)) + 1, 
+                y: Math.floor(Math.random() * (ROWS - 2)) + 1 
+            };
+        }
 
-            ctx.fillStyle = '#1a1a1a';
+        function resetGame() {
+            if (!p1) {
+                p1 = new Snake(10, 15, '#ff4747', true);
+                p2 = new Snake(30, 15, '#4747ff', false);
+            } else {
+                p1.init();
+                p2.init();
+            }
+            spawnFood();
+            gameRunning = true;
+            overlay.style.display = 'none';
+        }
+
+        window.addEventListener('keydown', e => {
+            // P1: WASD (Prevents 180 turns)
+            if (e.code === 'KeyW' && p1.dir.y === 0) p1.nextDir = { x: 0, y: -1 };
+            if (e.code === 'KeyS' && p1.dir.y === 0) p1.nextDir = { x: 0, y: 1 };
+            if (e.code === 'KeyA' && p1.dir.x === 0) p1.nextDir = { x: -1, y: 0 };
+            if (e.code === 'KeyD' && p1.dir.x === 0) p1.nextDir = { x: 1, y: 0 };
+
+            // P2: Arrows (Prevents 180 turns)
+            if (e.code === 'ArrowUp' && p2.dir.y === 0) p2.nextDir = { x: 0, y: -1 };
+            if (e.code === 'ArrowDown' && p2.dir.y === 0) p2.nextDir = { x: 0, y: 1 };
+            if (e.code === 'ArrowLeft' && p2.dir.x === 0) p2.nextDir = { x: -1, y: 0 };
+            if (e.code === 'ArrowRight' && p2.dir.x === 0) p2.nextDir = { x: 1, y: 0 };
+        });
+
+        function gameLoop() {
+            if (gameRunning) {
+                p1.update();
+                p2.update();
+                
+                // Cross-check collisions
+                p1.checkCollisions(p2);
+                p2.checkCollisions(p1);
+
+                if (!p1.alive || !p2.alive) {
+                    gameRunning = false;
+                    overlay.style.display = 'flex';
+                    if (!p1.alive && !p2.alive) statusText.innerText = "DRAW! BOTH DIED";
+                    else if (!p1.alive) statusText.innerText = "PLAYER 2 WINS!";
+                    else statusText.innerText = "PLAYER 1 WINS!";
+                }
+
+                s1Elem.innerText = p1.score;
+                s2Elem.innerText = p2.score;
+            }
+
+            // Draw Background
+            ctx.fillStyle = '#050505';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw border
-            ctx.strokeStyle = 'red'; ctx.lineWidth = 10;
-            ctx.strokeRect(-cx, -cy, WORLD_SIZE, WORLD_SIZE);
+            // Draw Grid Lines (Subtle)
+            ctx.strokeStyle = '#111';
+            ctx.lineWidth = 1;
+            for(let i=0; i<canvas.width; i+=GRID) {
+                ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i, canvas.height); ctx.stroke();
+            }
+            for(let i=0; i<canvas.height; i+=GRID) {
+                ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width, i); ctx.stroke();
+            }
 
-            // Food
-            food.forEach(f => {
-                ctx.fillStyle = f.c;
-                ctx.beginPath(); ctx.arc(f.x - cx, f.y - cy, f.r, 0, Math.PI*2); ctx.fill();
-            });
+            // Draw Food
+            ctx.fillStyle = '#00ff44';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff44';
+            ctx.fillRect(food.x * GRID, food.y * GRID, GRID - 2, GRID - 2);
+            ctx.shadowBlur = 0;
 
-            p1.draw(ctx, cx, cy);
-            p2.draw(ctx, cx, cy);
+            p1.draw();
+            p2.draw();
+
+            setTimeout(() => requestAnimationFrame(gameLoop), 100);
         }
+
+        resetGame();
+        gameLoop();
     </script>
 </body>
 </html>
