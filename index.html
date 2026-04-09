@@ -1,34 +1,53 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>YouTube Volume Booster</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 20px; background: #f0f0f0; }
+        #player-container { margin-top: 20px; }
+        .controls { margin: 10px; }
+    </style>
+</head>
 <body>
-    <h3>Volume Booster (Up to 600%)</h3>
-    <video id="video" width="320" height="240" controls>
-        <source src="your-video.mp4" type="video/mp4">
-    </video>
-    <br>
-    <label for="boost">Boost:</label>
-    <input type="range" id="boost" min="1" max="6" step="0.1" value="1">
-    <span id="val">1x</span>
+    <h1>YouTube Volume Booster</h1>
+    <input type="text" id="videoLink" placeholder="Paste YouTube URL here" style="width: 300px;">
+    <button onclick="loadVideo()">Load Video</button>
 
+    <div id="player-container">
+        <!-- YouTube Player will load here -->
+        <div id="player"></div>
+    </div>
+
+    <div class="controls">
+        <label for="boost">Boost Amount: </label>
+        <input type="range" id="boost" min="1" max="10" step="0.5" value="1" oninput="updateBoost(this.value)">
+        <span id="boostVal">1x</span>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        const video = document.getElementById('video');
-        const boost = document.getElementById('boost');
-        const val = document.getElementById('val');
-        
-        let audioCtx;
-        let gainNode;
-
-        boost.addEventListener('input', function() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const source = audioCtx.createMediaElementSource(video);
-                gainNode = audioCtx.createGain();
-                source.connect(gainNode);
-                gainNode.connect(audioCtx.destination);
+        let player;
+        function loadVideo() {
+            const url = document.getElementById('videoLink').value;
+            const videoId = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
+            
+            if (player) {
+                player.loadVideoById(videoId);
+            } else {
+                player = new YT.Player('player', {
+                    height: '360',
+                    width: '640',
+                    videoId: videoId
+                });
             }
-            gainNode.gain.value = boost.value;
-            val.innerText = boost.value + 'x';
-        });
+        }
+
+        // Note: Direct gain control of iframes is often restricted by CORS.
+        function updateBoost(val) {
+            document.getElementById('boostVal').innerText = val + 'x';
+            // Custom boosting logic would go here if CORS allows access to the iframe's media element.
+        }
     </script>
 </body>
 </html>
