@@ -15,13 +15,9 @@
         const ctx = canvas.getContext('2d');
         let snake = [{ x: 50, y: 50 }];
         let direction = { x: 0, y: 0 };
-        let food = { x: Math.floor(Math.random() * canvas.width / 10) * 10, y: Math.floor(Math.random() * canvas.height / 10) * 10 };
+        let food = generateFood();
         let eating = false;
-        let bots = Array.from({ length: 19 }, () => ({
-            x: Math.floor(Math.random() * canvas.width / 10) * 10,
-            y: Math.floor(Math.random() * canvas.height / 10) * 10,
-            direction: { x: (Math.random() < 0.5 ? 10 : -10), y: (Math.random() < 0.5 ? 10 : -10) }
-        }));
+        let bots = Array.from({ length: 19 }, () => createBot());
 
         document.addEventListener('keydown', (event) => {
             if (event.key === 'ArrowUp') direction = { x: 0, y: -10 };
@@ -29,6 +25,21 @@
             if (event.key === 'ArrowLeft') direction = { x: -10, y: 0 };
             if (event.key === 'ArrowRight') direction = { x: 10, y: 0 };
         });
+
+        function createBot() {
+            return {
+                x: Math.floor(Math.random() * canvas.width / 10) * 10,
+                y: Math.floor(Math.random() * canvas.height / 10) * 10,
+                direction: { x: (Math.random() < 0.5 ? 10 : -10), y: (Math.random() < 0.5 ? 10 : -10) }
+            };
+        }
+
+        function generateFood() {
+            return {
+                x: Math.floor(Math.random() * canvas.width / 10) * 10,
+                y: Math.floor(Math.random() * canvas.height / 10) * 10
+            };
+        }
 
         function drawRoundedRect(x, y, width, height, radius) {
             ctx.beginPath();
@@ -50,14 +61,12 @@
                 bot.x += bot.direction.x;
                 bot.y += bot.direction.y;
 
-                // Randomly change direction
                 if (Math.random() < 0.1) {
                     bot.direction.x = (Math.random() < 0.5 ? 10 : -10);
                     bot.direction.y = (Math.random() < 0.5 ? 10 : -10);
                 }
 
-                // Check for collisions with walls or other snakes
-                if (bot.x < 0 || bot.x >= canvas.width || bot.y < 0 || bot.y >= canvas.height || snake.some(segment => segment.x === bot.x && segment.y === bot.y)) {
+                if (bot.x < 0 || bot.x >= canvas.width || bot.y < 0 || bot.y >= canvas.height) {
                     restartGame();
                 }
             });
@@ -66,13 +75,9 @@
         function restartGame() {
             snake = [{ x: 50, y: 50 }];
             direction = { x: 0, y: 0 };
-            food = { x: Math.floor(Math.random() * canvas.width / 10) * 10, y: Math.floor(Math.random() * canvas.height / 10) * 10 };
+            food = generateFood();
             eating = false;
-            bots = Array.from({ length: 19 }, () => ({
-                x: Math.floor(Math.random() * canvas.width / 10) * 10,
-                y: Math.floor(Math.random() * canvas.height / 10) * 10,
-                direction: { x: (Math.random() < 0.5 ? 10 : -10), y: (Math.random() < 0.5 ? 10 : -10) }
-            }));
+            bots = Array.from({ length: 19 }, () => createBot());
         }
 
         function gameLoop() {
@@ -80,25 +85,24 @@
             const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
             snake.unshift(head);
 
-            // Check for food collision
             if (head.x === food.x && head.y === food.y) {
-                eating = true; // Set eating to true when food is consumed
-                food = { x: Math.floor(Math.random() * canvas.width / 10) * 10, y: Math.floor(Math.random() * canvas.height / 10) * 10 }; // Reposition food
+                eating = true;
+                food = generateFood();
             }
 
-            // If not eating, remove the last segment
             if (!eating) snake.pop();
-            else eating = false; // Reset eating after one frame
+            else eating = false;
 
-            // Collision detection for player vs. bots
-            if (bots.some(bot => bot.x === head.x && bot.y === head.y)) {
+            if (bots.some(bot => bot.x === head.x && bot.y === head.y) || 
+                snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y) || 
+                head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
                 restartGame();
             }
 
-            moveBots(); // Update bot positions
+            moveBots();
             snake.forEach(segment => drawRoundedRect(segment.x, segment.y, 10, 10, 5));
-            bots.forEach(bot => drawRoundedRect(bot.x, bot.y, 10, 10, 5)); // Draw bots
-            drawRoundedRect(food.x, food.y, 10, 10, 5); // Draw food
+            bots.forEach(bot => drawRoundedRect(bot.x, bot.y, 10, 10, 5));
+            drawRoundedRect(food.x, food.y, 10, 10, 5);
             requestAnimationFrame(gameLoop);
         }
 
