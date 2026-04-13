@@ -3,110 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Slither Game with Bots</title>
-    <style>
-        canvas { background: #000; display: block; margin: auto; }
-    </style>
+    <title>My Search Engine</title>
 </head>
 <body>
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        let snake = [{ x: 50, y: 50 }];
-        let direction = { x: 0, y: 0 };
-        let food = generateFood();
-        let eating = false;
-        let bots = Array.from({ length: 19 }, () => createBot());
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'ArrowUp') direction = { x: 0, y: -10 };
-            if (event.key === 'ArrowDown') direction = { x: 0, y: 10 };
-            if (event.key === 'ArrowLeft') direction = { x: -10, y: 0 };
-            if (event.key === 'ArrowRight') direction = { x: 10, y: 0 };
-        });
-
-        function createBot() {
-            return {
-                x: Math.floor(Math.random() * canvas.width / 10) * 10,
-                y: Math.floor(Math.random() * canvas.height / 10) * 10,
-                direction: { x: (Math.random() < 0.5 ? 10 : -10), y: (Math.random() < 0.5 ? 10 : -10) }
-            };
-        }
-
-        function generateFood() {
-            return {
-                x: Math.floor(Math.random() * canvas.width / 10) * 10,
-                y: Math.floor(Math.random() * canvas.height / 10) * 10
-            };
-        }
-
-        function drawRoundedRect(x, y, width, height, radius) {
-            ctx.beginPath();
-            ctx.moveTo(x + radius, y);
-            ctx.lineTo(x + width - radius, y);
-            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-            ctx.lineTo(x + width, y + height - radius);
-            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-            ctx.lineTo(x + radius, y + height);
-            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-            ctx.lineTo(x, y + radius);
-            ctx.quadraticCurveTo(x, y, x + radius, y);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-        function moveBots() {
-            bots.forEach(bot => {
-                bot.x += bot.direction.x;
-                bot.y += bot.direction.y;
-
-                if (Math.random() < 0.1) {
-                    bot.direction.x = (Math.random() < 0.5 ? 10 : -10);
-                    bot.direction.y = (Math.random() < 0.5 ? 10 : -10);
-                }
-
-                if (bot.x < 0 || bot.x >= canvas.width || bot.y < 0 || bot.y >= canvas.height) {
-                    restartGame();
-                }
-            });
-        }
-
-        function restartGame() {
-            snake = [{ x: 50, y: 50 }];
-            direction = { x: 0, y: 0 };
-            food = generateFood();
-            eating = false;
-            bots = Array.from({ length: 19 }, () => createBot());
-        }
-
-        function gameLoop() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-            snake.unshift(head);
-
-            if (head.x === food.x && head.y === food.y) {
-                eating = true;
-                food = generateFood();
-            }
-
-            if (!eating) snake.pop();
-            else eating = false;
-
-            if (bots.some(bot => bot.x === head.x && bot.y === head.y) || 
-                snake.slice(1).some(segment => segment.x === head.x && segment.y === head.y) || 
-                head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
-                restartGame();
-            }
-
-            moveBots();
-            snake.forEach(segment => drawRoundedRect(segment.x, segment.y, 10, 10, 5));
-            bots.forEach(bot => drawRoundedRect(bot.x, bot.y, 10, 10, 5));
-            drawRoundedRect(food.x, food.y, 10, 10, 5);
-            requestAnimationFrame(gameLoop);
-        }
-
-        gameLoop();
-    </script>
+    <h1>My Search Engine</h1>
+    <form action="https://www.google.com/search" method="get">
+        <input type="text" name="q" placeholder="Search..." required>
+        <button type="submit">Search</button>
+    </form>
 </body>
 </html>
