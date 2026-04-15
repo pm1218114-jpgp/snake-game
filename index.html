@@ -13,7 +13,7 @@
 
     <div id="chatWindow" style="display:none;">
         <h2>Chat with <span id="currentFriend"></span></h2>
-        <div id="messages"></div>
+        <div id="messages" style="border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll;"></div>
         <input type="text" id="messageInput" placeholder="Type your message or emoji" />
         <button onclick="sendMessage()">Send</button>
         <button onclick="insertEmoji('😊')">😊</button>
@@ -30,8 +30,15 @@
         function sendMessage() {
             const message = document.getElementById('messageInput').value;
             const messagesDiv = document.getElementById('messages');
-            messagesDiv.innerHTML += `<p>${message}</p>`;
+            messagesDiv.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
             document.getElementById('messageInput').value = '';
+            receiveMessage("Friend's response!"); // Simulate a friend's response
+        }
+
+        function receiveMessage(message) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML += `<p><strong>Friend:</strong> ${message}</p>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
         }
 
         function insertEmoji(emoji) {
