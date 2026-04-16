@@ -232,6 +232,14 @@
       <div class="add-friend" id="addFriendArea">
         <input id="addFriendInput" placeholder="Add Friend: username#1234" />
       </div>
+
+      <div style="padding:8px 10px;border-top:1px solid #232427;font-size:12px;background:#202225;">
+        <div style="margin-bottom:4px;font-size:11px;text-transform:uppercase;color:#72767d;">Your Profile</div>
+        <input id="myNameInput" placeholder="Your name" style="width:100%;margin-bottom:4px;padding:4px 6px;border-radius:4px;border:none;outline:none;background:#18191c;color:#dcddde;font-size:12px;" />
+        <input id="myTagInput" placeholder="Tag (e.g. 1234)" style="width:100%;margin-bottom:4px;padding:4px 6px;border-radius:4px;border:none;outline:none;background:#18191c;color:#dcddde;font-size:12px;" />
+        <button id="saveProfileBtn" style="width:100%;background:#5865f2;border:none;color:#fff;font-size:12px;border-radius:4px;padding:4px 0;cursor:pointer;margin-bottom:4px;">Save Username</button>
+        <div style="font-size:11px;color:#b9bbbe;">Share this with friends: <span id="myFullId">you#0001</span></div>
+      </div>
     </div>
 
     <div class="content">
@@ -255,8 +263,7 @@
   </div>
 
   <script>
-    // ------- Simple in-memory data -------
-    const me = { id: 'me', name: 'You', tag: 'you#0001' };
+    const me = { id: 'me', name: 'You', tag: '0001' };
 
     const state = {
       friends: [
@@ -264,18 +271,15 @@
         { id: '2', name: 'Bob', tag: 'bob#5678' },
         { id: '3', name: 'Charlie', tag: 'charlie#9999' },
       ],
-      conversations: {}, // id -> { id, type: 'dm'|'group', name, members: [...ids], messages: []}
+      conversations: {},
       activeConvId: null,
       activeTab: 'friends',
       callStatus: 'No call active',
       pinnedByConv: {},
     };
 
-    function convIdForDM(friendId) {
-      return 'dm_' + friendId;
-    }
+    function convIdForDM(friendId) { return 'dm_' + friendId; }
 
-    // Ensure DM exists
     function getOrCreateDM(friend) {
       const id = convIdForDM(friend.id);
       if (!state.conversations[id]) {
@@ -293,18 +297,11 @@
     function createGroupDM(selectedFriendIds) {
       const id = 'group_' + Date.now();
       const name = 'Group with ' + selectedFriendIds.map(id => state.friends.find(f => f.id === id)?.name || 'Friend').join(', ');
-      const conv = {
-        id,
-        type: 'group',
-        name,
-        members: [me.id, ...selectedFriendIds],
-        messages: [],
-      };
+      const conv = { id, type: 'group', name, members: [me.id, ...selectedFriendIds], messages: [] };
       state.conversations[id] = conv;
       return conv;
     }
 
-    // ------- Rendering -------
     const friendsTab = document.getElementById('friendsTab');
     const dmsTab = document.getElementById('dmsTab');
     const listContainer = document.getElementById('listContainer');
@@ -317,9 +314,17 @@
     const statusBar = document.getElementById('statusBar');
     const newGroupBtn = document.getElementById('newGroupBtn');
 
+    const myNameInput = document.getElementById('myNameInput');
+    const myTagInput = document.getElementById('myTagInput');
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+    const myFullIdSpan = document.getElementById('myFullId');
+
+    function updateMyIdDisplay() {
+      myFullIdSpan.textContent = `${me.name}#${me.tag}`;
+    }
+
     function renderSidebar() {
       listContainer.innerHTML = '';
-
       if (state.activeTab === 'friends') {
         friendsHeader.textContent = 'All Friends';
         addFriendArea.style.display = 'block';
@@ -328,10 +333,7 @@
           const item = document.createElement('div');
           item.className = 'item';
           item.innerHTML = `<span class="name">${fr.name}</span><span style="font-size:11px;color:#72767d;">${fr.tag}</span>`;
-          item.onclick = () => {
-            const dm = getOrCreateDM(fr);
-            setActiveConversation(dm.id);
-          };
+          item.onclick = () => { const dm = getOrCreateDM(fr); setActiveConversation(dm.id); };
           frag.appendChild(item);
         });
         listContainer.appendChild(frag);
@@ -365,23 +367,18 @@
       messagesEl.innerHTML = '';
       const conv = state.conversations[state.activeConvId];
       if (!conv) return;
-
       const pinnedId = state.pinnedByConv[conv.id];
       const frag = document.createDocumentFragment();
-
       conv.messages.forEach(msg => {
         const div = document.createElement('div');
         div.className = 'message';
         if (msg.id === pinnedId) div.classList.add('pinned');
-
         const header = document.createElement('div');
         header.className = 'message-header';
         header.innerHTML = `<span class="author">${msg.author}</span><span class="time">${msg.time}</span>`;
-
         const text = document.createElement('div');
         text.className = 'text';
         text.textContent = msg.text;
-
         const actions = document.createElement('div');
         actions.className = 'msg-actions';
         const editBtn = document.createElement('div');
@@ -390,12 +387,8 @@
         editBtn.onclick = (e) => {
           e.stopPropagation();
           const newText = prompt('Edit message:', msg.text);
-          if (newText !== null) {
-            msg.text = newText;
-            renderMessages();
-          }
+          if (newText !== null) { msg.text = newText; renderMessages(); }
         };
-
         const delBtn = document.createElement('div');
         delBtn.className = 'msg-action-btn';
         delBtn.textContent = 'Delete';
@@ -404,7 +397,6 @@
           conv.messages = conv.messages.filter(m => m.id !== msg.id);
           renderMessages();
         };
-
         const pinBtn = document.createElement('div');
         pinBtn.className = 'msg-action-btn';
         pinBtn.textContent = msg.id === pinnedId ? 'Unpin' : 'Pin';
@@ -413,57 +405,43 @@
           state.pinnedByConv[conv.id] = msg.id === pinnedId ? null : msg.id;
           renderMessages();
         };
-
         actions.appendChild(editBtn);
         actions.appendChild(delBtn);
         actions.appendChild(pinBtn);
-
         div.appendChild(header);
         div.appendChild(text);
         div.appendChild(actions);
         frag.appendChild(div);
       });
-
       messagesEl.appendChild(frag);
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }
 
-    function addMessageToActive(text, author = 'You') {
+    function addMessageToActive(text, authorName) {
       const conv = state.conversations[state.activeConvId];
       if (!conv) return;
       const now = new Date();
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       conv.messages.push({
         id: 'm' + Date.now() + Math.random().toString(16).slice(2),
-        author,
+        author: authorName,
         text,
         time: timeStr,
       });
       renderMessages();
     }
 
-    // ------- Events -------
-    friendsTab.onclick = () => {
-      state.activeTab = 'friends';
-      friendsTab.classList.add('active');
-      dmsTab.classList.remove('active');
-      renderSidebar();
-    };
-
-    dmsTab.onclick = () => {
-      state.activeTab = 'dms';
-      dmsTab.classList.add('active');
-      friendsTab.classList.remove('active');
-      renderSidebar();
-    };
+    friendsTab.onclick = () => { state.activeTab = 'friends'; friendsTab.classList.add('active'); dmsTab.classList.remove('active'); renderSidebar(); };
+    dmsTab.onclick = () => { state.activeTab = 'dms'; dmsTab.classList.add('active'); friendsTab.classList.remove('active'); renderSidebar(); };
 
     addFriendInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         const value = addFriendInput.value.trim();
         if (!value) return;
-        const [name, tag] = value.split('#');
+        const [name, tagPart] = value.split('#');
         const id = String(Date.now());
-        state.friends.push({ id, name: name || value, tag: tag ? name + '#' + tag : name + '#0000' });
+        const tag = tagPart ? value : name + '#0000';
+        state.friends.push({ id, name: name || value, tag });
         addFriendInput.value = '';
         renderSidebar();
       }
@@ -473,7 +451,7 @@
       if (e.key === 'Enter') {
         const text = messageInput.value.trim();
         if (!text) return;
-        addMessageToActive(text, 'You');
+        addMessageToActive(text, `${me.name}`);
         messageInput.value = '';
       }
     });
@@ -491,23 +469,13 @@
       setActiveConversation(conv.id);
     };
 
-    // Simulated call / screen share states
     const voiceBtn = document.getElementById('voiceCallBtn');
     const videoBtn = document.getElementById('videoCallBtn');
     const screenBtn = document.getElementById('screenShareBtn');
 
-    voiceBtn.onclick = () => {
-      state.callStatus = 'In Voice Call (simulated room: users can drop in/out)';
-      updateStatus();
-    };
-    videoBtn.onclick = () => {
-      state.callStatus = 'In Video Call (simulated)';
-      updateStatus();
-    };
-    screenBtn.onclick = () => {
-      state.callStatus = 'Screen Sharing (simulated) – great for games or projects';
-      updateStatus();
-    };
+    voiceBtn.onclick = () => { state.callStatus = 'In Voice Call (simulated room)'; updateStatus(); };
+    videoBtn.onclick = () => { state.callStatus = 'In Video Call (simulated)'; updateStatus(); };
+    screenBtn.onclick = () => { state.callStatus = 'Screen Sharing (simulated)'; updateStatus(); };
 
     function updateStatus() {
       statusBar.textContent = state.callStatus + ' · Overlay (simulated) shows who is talking.';
@@ -520,13 +488,17 @@
       messagesEl.innerHTML = '';
     };
 
-    // ------- Bootstrap -------
+    saveProfileBtn.onclick = () => {
+      const name = myNameInput.value.trim() || 'You';
+      const tag = myTagInput.value.trim() || '0001';
+      me.name = name;
+      me.tag = tag;
+      updateMyIdDisplay();
+    };
+
     renderSidebar();
-    // Auto-open first friend DM for demo
-    if (state.friends[0]) {
-      const dm = getOrCreateDM(state.friends[0]);
-      setActiveConversation(dm.id);
-    }
+    updateMyIdDisplay();
+    if (state.friends[0]) { const dm = getOrCreateDM(state.friends[0]); setActiveConversation(dm.id); }
   </script>
 </body>
 </html>
