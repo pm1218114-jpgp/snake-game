@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+<<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Mini Slither.io Demo</title>
+  <title>Mini Slither.io – Full Demo</title>
   <style>
     html, body {
       margin: 0;
@@ -25,7 +25,7 @@
   </style>
 </head>
 <body>
-  <div id="ui">Mass: <span id="mass">0</span> | Use mouse to steer, hold left button to boost</div>
+  <div id="ui">Mass: <span id="mass">0</span> | Move mouse to steer, hold left button to boost</div>
   <canvas id="game"></canvas>
 
   <script>
@@ -40,12 +40,13 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Arena settings
-    const ARENA_RADIUS = 3000; // circular arena
-    const NATURAL_PELLET_COUNT = 500;
+    // Core arena & pellet settings
+    const ARENA_RADIUS = 3000;                       // circular arena (border = instant death, no pellets)
+    const NATURAL_PELLET_COUNT = 500;                // background food
     const NATURAL_PELLET_VALUE = 1;
-    const DEATH_PELLET_VALUE = 10;
+    const DEATH_PELLET_VALUE = 10;                   // big pellets from dead snakes
 
+    // Mouse / control
     let mouseX = canvas.width / 2;
     let mouseY = canvas.height / 2;
     let mouseDown = false;
@@ -57,67 +58,169 @@
     canvas.addEventListener('mousedown', () => mouseDown = true);
     canvas.addEventListener('mouseup', () => mouseDown = false);
 
-    // Snake representation: head position + body segments as trailing points
-    class Snake {
-      constructor(x, y, color) {
+    // ---------- Utility ----------
+    function pointDist2(ax, ay, bx, by) {
+      const dx = ax - bx;
+      const dy = ay - by;
+      return dx * dx + dy * dy;
+    }
+
+    function randomInCircle(r) {
+      const dist = Math.random() * r;
+      const ang = Math.random() * Math.PI * 2;
+      return { x: Math.cos(ang) * dist, y: Math.sin(ang) * dist };
+    }
+
+    // ---------- Pellet ----------
+    class Pellet {
+      constructor(x, y, value, color, fromBoost = false) {
         this.x = x;
         this.y = y;
-        this.angle = 0;
-        this.baseSpeed = 2.2;
-        this.boostSpeed = 4.2;
-        this.length = 60;     // visual length
-        this.mass = 20;       // starting mass
-        this.radius = 10;     // head radius, scales with mass
+        this.value = value;
+        this.color = color;
+        this.radius = fromBoost ? 2 : 4 + Math.log2(value + 1);
+      }
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const pellets = [];
+
+    function spawnNaturalPellets() {
+      while (pellets.length < NATURAL_PELLET_COUNT) {
+        const r = Math.random() * ARENA_RADIUS * 0.98;
+        const a = Math.random() * Math.PI * 2;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        pellets.push(new Pellet(x, y, NATURAL_PELLET_VALUE, '#44aaff'));
+      }
+    }
+
+    // ---------- Snake (player + bots) ----------
+    class Snake {
+      constructor(x, y, color, isBot = false, name = '') {
+        this.x = x;
+        this.y = y;
+        this.angle = Math.random() * Math.PI * 2;
+        this.baseSpeed = isBot ? 1.8 : 2.2;
+        this.boostSpeed = isBot ? 3.0 : 4.2;
+        this.length = 60;        // visual length (segments count proxy)
+        this.mass = isBot ? 25 : 20;
+        this.radius = 10;        // head radius, scales with mass
         this.color = color;
         this.segments = [];
         this.segmentSpacing = 4;
         this.alive = true;
+        this.isBot = isBot;
+        this.name = name;
+
+        // Bot AI state
+        this.botTargetAngle = this.angle;
+        this.botTargetChangeTimer = 0;
+        this.botEvasionTimer = 0;
       }
 
       get speed() {
-        return mouseDown && this.mass > 5 ? this.boostSpeed : this.baseSpeed;
+        const boosting = !this.isBot ? (mouseDown && this.mass > 5) : this.botEvasionTimer > 0;
+        return boosting && this.mass > 5 ? this.boostSpeed : this.baseSpeed;
       }
 
-      update(dt, targetAngle) {
+      update(dt, playerRef) {
         if (!this.alive) return;
 
-        // Turning radius widens with mass
-        const turnRateBase = 0.12;
-        const turnRate = turnRateBase / (1 + this.mass / 80); // larger = slower turn
+        // Choose target angle: player is driven by mouse; bots by simple AI
+        let targetAngle;
+        if (this.isBot) {
+          this.updateBotLogic(dt, playerRef);
+          targetAngle = this.botTargetAngle;
+        } else {
+          const cam = getCamera();
+          const worldMouseX = mouseX / cam.zoom + cam.x;
+          const worldMouseY = mouseY / cam.zoom + cam.y;
+          targetAngle = Math.atan2(worldMouseY - this.y, worldMouseX - this.x);
+        }
 
-        // Smoothly turn toward target
+        // Dynamic scaling: larger snakes turn slower
+        const turnRateBase = 0.12;
+        const turnRate = turnRateBase / (1 + this.mass / 80);
         let da = ((targetAngle - this.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
         this.angle += Math.max(-turnRate, Math.min(turnRate, da));
 
-        // Move
-        const v = this.speed * dt * 60; // normalize by frame
+        // Continuous movement
+        const v = this.speed * dt * 60;
         this.x += Math.cos(this.angle) * v;
         this.y += Math.sin(this.angle) * v;
 
-        // Arena border death (no pellets dropped)
+        // Arena border: death, no pellets
         const distFromCenter = Math.hypot(this.x, this.y);
         if (distFromCenter > ARENA_RADIUS) {
           this.die(false);
         }
 
-        // Body segments follow head
+        // Body trail (for coiling, cutting off, etc.)
         this.segments.unshift({ x: this.x, y: this.y });
         const maxSeg = Math.max(10, this.length);
         while (this.segments.length > maxSeg) this.segments.pop();
 
-        // Boost cost: convert mass into pellets
-        if (mouseDown && this.mass > 5) {
-          this.mass -= 0.1 * dt * 60;
+        // Boost mechanics: cost mass, drop small pellets
+        const boosting = (!this.isBot ? (mouseDown && this.mass > 5) : this.botEvasionTimer > 0);
+        if (boosting && this.mass > 5) {
+          this.mass -= 0.08 * dt * 60;
           if (Math.random() < 0.4) {
             pellets.push(new Pellet(this.x, this.y, NATURAL_PELLET_VALUE, '#55ffff', true));
           }
         }
 
-        // Adjust visuals with mass
+        if (this.botEvasionTimer > 0) this.botEvasionTimer -= dt;
+
+        // Visual scaling with mass
         this.radius = 6 + Math.sqrt(this.mass);
         this.length = 40 + this.mass * 1.5;
 
-        massEl.textContent = this.mass.toFixed(1);
+        if (!this.isBot) massEl.textContent = this.mass.toFixed(1);
+      }
+
+      updateBotLogic(dt, playerRef) {
+        this.botTargetChangeTimer -= dt;
+
+        // Default: straight-ish line with minor random adjustment
+        if (this.botTargetChangeTimer <= 0) {
+          this.botTargetAngle = this.angle + (Math.random() - 0.5) * 0.3;
+          this.botTargetChangeTimer = 1 + Math.random() * 2;
+        }
+
+        // Simple pellet attraction ("scavenging")
+        let closest = null;
+        let bestD2 = 200 * 200;
+        for (const p of pellets) {
+          const d2 = pointDist2(this.x, this.y, p.x, p.y);
+          if (d2 < bestD2) { bestD2 = d2; closest = p; }
+        }
+        if (closest && Math.random() < 0.5) {
+          this.botTargetAngle = Math.atan2(closest.y - this.y, closest.x - this.x);
+        }
+
+        // Keep inside arena (avoid border death)
+        const dCenter = Math.hypot(this.x, this.y);
+        if (dCenter > ARENA_RADIUS * 0.85) {
+          const towardCenter = Math.atan2(-this.y, -this.x);
+          this.botTargetAngle = towardCenter + (Math.random() - 0.5) * 0.4;
+        }
+
+        // Bot evasion: if the boosting player comes close, dodge sideways
+        if (playerRef && playerRef.alive) {
+          const detectionRadius = 200;
+          const d2ToPlayer = pointDist2(this.x, this.y, playerRef.x, playerRef.y);
+          const playerBoosting = mouseDown;
+          if (playerBoosting && d2ToPlayer < detectionRadius * detectionRadius) {
+            this.botTargetAngle += (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2);
+            this.botEvasionTimer = 0.7;
+          }
+        }
       }
 
       draw() {
@@ -142,7 +245,7 @@
         ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // Simple eyes
+        // Eyes (just for fun)
         const eyeOffset = this.radius * 0.4;
         const ex = Math.cos(this.angle) * eyeOffset;
         const ey = Math.sin(this.angle) * eyeOffset;
@@ -151,6 +254,14 @@
         ctx.arc(this.x + ex, this.y + ey, this.radius * 0.22, 0, Math.PI * 2);
         ctx.arc(this.x + ex, this.y - ey * 0.4, this.radius * 0.22, 0, Math.PI * 2);
         ctx.fill();
+
+        // Bot name tags (identification like official bots)
+        if (this.isBot) {
+          ctx.fillStyle = '#fff';
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(this.name + ' (bot)', this.x, this.y - this.radius - 6);
+        }
       }
 
       die(dropPellets = true) {
@@ -163,134 +274,42 @@
             const idx = Math.min(this.segments.length - 1, Math.floor(t));
             const p = this.segments[idx] || { x: this.x, y: this.y };
             const jitter = 5;
-            pellets.push(
-              new Pellet(
-                p.x + (Math.random() - 0.5) * jitter,
-                p.y + (Math.random() - 0.5) * jitter,
-                DEATH_PELLET_VALUE,
-                '#ffdd55'
-              )
-            );
+            pellets.push(new Pellet(
+              p.x + (Math.random() - 0.5) * jitter,
+              p.y + (Math.random() - 0.5) * jitter,
+              DEATH_PELLET_VALUE,
+              '#ffdd55'
+            ));
           }
         }
       }
     }
 
-    class Pellet {
-      constructor(x, y, value, color, fromBoost = false) {
-        this.x = x;
-        this.y = y;
-        this.value = value;
-        this.color = color;
-        this.radius = fromBoost ? 2 : 4 + Math.log2(value + 1);
-      }
-      draw() {
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fill();
+    // Player + bots
+    const player = new Snake(0, 0, '#33ff66', false, 'You');
+    const bots = [];
+
+    function spawnBots(count) {
+      const botNames = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Omega', 'Sigma', 'Tau', 'Rho'];
+      for (let i = 0; i < count; i++) {
+        const pos = randomInCircle(ARENA_RADIUS * 0.8);
+        const color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        const name = botNames[i % botNames.length];
+        bots.push(new Snake(pos.x, pos.y, color, true, name));
       }
     }
 
-    const player = new Snake(0, 0, '#33ff66');
-    const pellets = [];
-
-    function spawnNaturalPellets() {
-      while (pellets.length < NATURAL_PELLET_COUNT) {
-        const r = Math.random() * ARENA_RADIUS * 0.98;
-        const a = Math.random() * Math.PI * 2;
-        const x = Math.cos(a) * r;
-        const y = Math.sin(a) * r;
-        pellets.push(new Pellet(x, y, NATURAL_PELLET_VALUE, '#44aaff'));
-      }
-    }
-
-    // Collision helpers
-    function pointDist2(ax, ay, bx, by) {
-      const dx = ax - bx;
-      const dy = ay - by;
-      return dx * dx + dy * dy;
-    }
-
-    function checkCollisions() {
-      if (!player.alive) return;
-
-      // Head with pellets
-      for (let i = pellets.length - 1; i >= 0; i--) {
-        const p = pellets[i];
-        const d2 = pointDist2(player.x, player.y, p.x, p.y);
-        const hitR = player.radius + p.radius + 2;
-        if (d2 < hitR * hitR) {
-          player.mass += p.value;
-          pellets.splice(i, 1);
-        }
-      }
-
-      // Head with own body (self immune): skip
-      // But head can collide with other snakes in a full game.
-      // Here we only have one snake, so we simulate death when
-      // it "coils too tightly" (optional simple rule):
-      for (let i = 10; i < player.segments.length; i++) {
-        const s = player.segments[i];
-        const d2 = pointDist2(player.x, player.y, s.x, s.y);
-        const r = player.radius * 0.7;
-        if (d2 < r * r) {
-          // Comment this out if you want perfect self-immunity
-          // player.die(true);
-          break;
-        }
-      }
-    }
-
-    let lastTime = performance.now();
-
-    function gameLoop(now) {
-      const dt = Math.min(0.05, (now - lastTime) / 1000);
-      lastTime = now;
-
-      // Determine desired angle from cursor
-      const cam = getCamera();
-      const worldMouseX = mouseX / cam.zoom + cam.x;
-      const worldMouseY = mouseY / cam.zoom + cam.y;
-      const angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
-
-      if (player.alive) {
-        player.update(dt, angle);
-      }
-
-      spawnNaturalPellets();
-      checkCollisions();
-
-      // Render
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Camera & zoom scale with mass (dynamic scaling)
-      applyCamera();
-
-      drawArena();
-      for (const p of pellets) p.draw();
-      player.draw();
-
-      if (!player.alive) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#fff';
-        ctx.font = '28px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('You died! Refresh to restart.', canvas.width / 2, canvas.height / 2);
-      }
-
-      requestAnimationFrame(gameLoop);
-    }
-
+    // ---------- Camera / dynamic scaling ----------
     function getCamera() {
-      // Zoom out as mass grows
+      // As you grow, zoom out (bigger view but lower agility)
       const baseZoom = 1.2;
-      const maxZoomOut = 0.4; // minimum zoom factor
+      const maxZoomOut = 0.4;
       const z = Math.max(maxZoomOut, baseZoom - player.mass / 2000);
-      return { x: player.x - canvas.width / 2 / z, y: player.y - canvas.height / 2 / z, zoom: z };
+      return {
+        x: player.x - canvas.width / 2 / z,
+        y: player.y - canvas.height / 2 / z,
+        zoom: z
+      };
     }
 
     function applyCamera() {
@@ -306,7 +325,7 @@
       ctx.arc(0, 0, ARENA_RADIUS, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Light grid for reference (center-heavy -> scavenging feel)
+      // Grid (center gets dense in action)
       ctx.strokeStyle = '#111';
       ctx.lineWidth = 1;
       const step = 200;
@@ -324,6 +343,107 @@
       ctx.stroke();
     }
 
+    // ---------- Collision handling ----------
+    function handleCollisions() {
+      // Player vs pellets
+      if (player.alive) {
+        for (let i = pellets.length - 1; i >= 0; i--) {
+          const p = pellets[i];
+          const d2 = pointDist2(player.x, player.y, p.x, p.y);
+          const hitR = player.radius + p.radius + 2;
+          if (d2 < hitR * hitR) {
+            player.mass += p.value;
+            pellets.splice(i, 1);
+          }
+        }
+      }
+
+      // Bots vs pellets
+      for (const b of bots) {
+        if (!b.alive) continue;
+        for (let i = pellets.length - 1; i >= 0; i--) {
+          const p = pellets[i];
+          const d2 = pointDist2(b.x, b.y, p.x, p.y);
+          const hitR = b.radius + p.radius + 2;
+          if (d2 < hitR * hitR) {
+            b.mass += p.value * 0.7; // bots grow a bit slower
+            pellets.splice(i, 1);
+          }
+        }
+      }
+
+      // Player head vs bot bodies (standard Slither kill rule)
+      if (player.alive) {
+        for (const b of bots) {
+          if (!b.alive) continue;
+          for (let i = 5; i < b.segments.length; i++) { // skip bot head / near-head
+            const s = b.segments[i];
+            const d2 = pointDist2(player.x, player.y, s.x, s.y);
+            const r = player.radius + b.radius * 0.7;
+            if (d2 < r * r) {
+              player.die(true);
+              return;
+            }
+          }
+        }
+      }
+
+      // Player head vs bot heads (bigger mass survives)
+      if (player.alive) {
+        for (const b of bots) {
+          if (!b.alive) continue;
+          const d2 = pointDist2(player.x, player.y, b.x, b.y);
+          const r = player.radius + b.radius;
+          if (d2 < r * r) {
+            if (player.mass >= b.mass) b.die(true); else player.die(true);
+          }
+        }
+      }
+
+      // Self-immunity: player can cross their own body (no self-collision)
+      // If you want to experiment, you could add a check here similar to bot body collisions.
+    }
+
+    // ---------- Main loop ----------
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      // Update entities
+      if (player.alive) player.update(dt, null);
+      for (const b of bots) b.update(dt, player);
+
+      spawnNaturalPellets();
+      handleCollisions();
+
+      // Render
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      applyCamera();
+      drawArena();
+
+      for (const p of pellets) p.draw();
+      for (const b of bots) b.draw();
+      player.draw();
+
+      if (!player.alive) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('You died! Refresh to restart.', canvas.width / 2, canvas.height / 2);
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Init
+    spawnBots(6);              // official-like in-game bots / "Play vs AI"
     requestAnimationFrame(gameLoop);
   </script>
 </body>
