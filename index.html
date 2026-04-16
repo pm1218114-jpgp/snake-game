@@ -1,50 +1,330 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat App with Emojis</title>
+  <meta charset="UTF-8" />
+  <title>Mini Slither.io Demo</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #02020a;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    #ui {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 10;
+      font-size: 14px;
+      background: rgba(0,0,0,0.5);
+      padding: 6px 10px;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 <body>
-    <h1>Chat App</h1>
-    <input type="text" id="username" placeholder="Enter your username" />
-    <input type="text" id="friendUsername" placeholder="Enter friend's username" />
-    <button onclick="startChat()">Chat</button>
+  <div id="ui">Mass: <span id="mass">0</span> | Use mouse to steer, hold left button to boost</div>
+  <canvas id="game"></canvas>
 
-    <div id="chatWindow" style="display:none;">
-        <h2>Chat with <span id="currentFriend"></span></h2>
-        <div id="messages" style="border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll;"></div>
-        <input type="text" id="messageInput" placeholder="Type your message or emoji" />
-        <button onclick="sendMessage()">Send</button>
-        <button onclick="insertEmoji('😊')">😊</button>
-        <button onclick="insertEmoji('👍')">👍</button>
-    </div>
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const massEl = document.getElementById('mass');
 
-    <script>
-        function startChat() {
-            const friendUsername = document.getElementById('friendUsername').value;
-            document.getElementById('currentFriend').innerText = friendUsername;
-            document.getElementById('chatWindow').style.display = 'block';
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Arena settings
+    const ARENA_RADIUS = 3000; // circular arena
+    const NATURAL_PELLET_COUNT = 500;
+    const NATURAL_PELLET_VALUE = 1;
+    const DEATH_PELLET_VALUE = 10;
+
+    let mouseX = canvas.width / 2;
+    let mouseY = canvas.height / 2;
+    let mouseDown = false;
+
+    canvas.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+    canvas.addEventListener('mousedown', () => mouseDown = true);
+    canvas.addEventListener('mouseup', () => mouseDown = false);
+
+    // Snake representation: head position + body segments as trailing points
+    class Snake {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.angle = 0;
+        this.baseSpeed = 2.2;
+        this.boostSpeed = 4.2;
+        this.length = 60;     // visual length
+        this.mass = 20;       // starting mass
+        this.radius = 10;     // head radius, scales with mass
+        this.color = color;
+        this.segments = [];
+        this.segmentSpacing = 4;
+        this.alive = true;
+      }
+
+      get speed() {
+        return mouseDown && this.mass > 5 ? this.boostSpeed : this.baseSpeed;
+      }
+
+      update(dt, targetAngle) {
+        if (!this.alive) return;
+
+        // Turning radius widens with mass
+        const turnRateBase = 0.12;
+        const turnRate = turnRateBase / (1 + this.mass / 80); // larger = slower turn
+
+        // Smoothly turn toward target
+        let da = ((targetAngle - this.angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        this.angle += Math.max(-turnRate, Math.min(turnRate, da));
+
+        // Move
+        const v = this.speed * dt * 60; // normalize by frame
+        this.x += Math.cos(this.angle) * v;
+        this.y += Math.sin(this.angle) * v;
+
+        // Arena border death (no pellets dropped)
+        const distFromCenter = Math.hypot(this.x, this.y);
+        if (distFromCenter > ARENA_RADIUS) {
+          this.die(false);
         }
 
-        function sendMessage() {
-            const message = document.getElementById('messageInput').value;
-            const messagesDiv = document.getElementById('messages');
-            messagesDiv.innerHTML += `<p><strong>You:</strong> ${message}</p>`;
-            document.getElementById('messageInput').value = '';
-            receiveMessage("Friend's response!"); // Simulate a friend's response
+        // Body segments follow head
+        this.segments.unshift({ x: this.x, y: this.y });
+        const maxSeg = Math.max(10, this.length);
+        while (this.segments.length > maxSeg) this.segments.pop();
+
+        // Boost cost: convert mass into pellets
+        if (mouseDown && this.mass > 5) {
+          this.mass -= 0.1 * dt * 60;
+          if (Math.random() < 0.4) {
+            pellets.push(new Pellet(this.x, this.y, NATURAL_PELLET_VALUE, '#55ffff', true));
+          }
         }
 
-        function receiveMessage(message) {
-            const messagesDiv = document.getElementById('messages');
-            messagesDiv.innerHTML += `<p><strong>Friend:</strong> ${message}</p>`;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
-        }
+        // Adjust visuals with mass
+        this.radius = 6 + Math.sqrt(this.mass);
+        this.length = 40 + this.mass * 1.5;
 
-        function insertEmoji(emoji) {
-            const input = document.getElementById('messageInput');
-            input.value += emoji;  // Append emoji to the message input
+        massEl.textContent = this.mass.toFixed(1);
+      }
+
+      draw() {
+        if (!this.alive) return;
+
+        // Body
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.radius * 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < this.segments.length; i++) {
+          const p = this.segments[i];
+          if (i === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
         }
-    </script>
+        ctx.stroke();
+
+        // Head
+        ctx.fillStyle = '#ffffaa';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Simple eyes
+        const eyeOffset = this.radius * 0.4;
+        const ex = Math.cos(this.angle) * eyeOffset;
+        const ey = Math.sin(this.angle) * eyeOffset;
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(this.x + ex, this.y + ey, this.radius * 0.22, 0, Math.PI * 2);
+        ctx.arc(this.x + ex, this.y - ey * 0.4, this.radius * 0.22, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      die(dropPellets = true) {
+        if (!this.alive) return;
+        this.alive = false;
+        if (dropPellets) {
+          const count = Math.max(5, Math.floor(this.mass / 3));
+          for (let i = 0; i < count; i++) {
+            const t = i / count * this.segments.length;
+            const idx = Math.min(this.segments.length - 1, Math.floor(t));
+            const p = this.segments[idx] || { x: this.x, y: this.y };
+            const jitter = 5;
+            pellets.push(
+              new Pellet(
+                p.x + (Math.random() - 0.5) * jitter,
+                p.y + (Math.random() - 0.5) * jitter,
+                DEATH_PELLET_VALUE,
+                '#ffdd55'
+              )
+            );
+          }
+        }
+      }
+    }
+
+    class Pellet {
+      constructor(x, y, value, color, fromBoost = false) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.color = color;
+        this.radius = fromBoost ? 2 : 4 + Math.log2(value + 1);
+      }
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const player = new Snake(0, 0, '#33ff66');
+    const pellets = [];
+
+    function spawnNaturalPellets() {
+      while (pellets.length < NATURAL_PELLET_COUNT) {
+        const r = Math.random() * ARENA_RADIUS * 0.98;
+        const a = Math.random() * Math.PI * 2;
+        const x = Math.cos(a) * r;
+        const y = Math.sin(a) * r;
+        pellets.push(new Pellet(x, y, NATURAL_PELLET_VALUE, '#44aaff'));
+      }
+    }
+
+    // Collision helpers
+    function pointDist2(ax, ay, bx, by) {
+      const dx = ax - bx;
+      const dy = ay - by;
+      return dx * dx + dy * dy;
+    }
+
+    function checkCollisions() {
+      if (!player.alive) return;
+
+      // Head with pellets
+      for (let i = pellets.length - 1; i >= 0; i--) {
+        const p = pellets[i];
+        const d2 = pointDist2(player.x, player.y, p.x, p.y);
+        const hitR = player.radius + p.radius + 2;
+        if (d2 < hitR * hitR) {
+          player.mass += p.value;
+          pellets.splice(i, 1);
+        }
+      }
+
+      // Head with own body (self immune): skip
+      // But head can collide with other snakes in a full game.
+      // Here we only have one snake, so we simulate death when
+      // it "coils too tightly" (optional simple rule):
+      for (let i = 10; i < player.segments.length; i++) {
+        const s = player.segments[i];
+        const d2 = pointDist2(player.x, player.y, s.x, s.y);
+        const r = player.radius * 0.7;
+        if (d2 < r * r) {
+          // Comment this out if you want perfect self-immunity
+          // player.die(true);
+          break;
+        }
+      }
+    }
+
+    let lastTime = performance.now();
+
+    function gameLoop(now) {
+      const dt = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      // Determine desired angle from cursor
+      const cam = getCamera();
+      const worldMouseX = mouseX / cam.zoom + cam.x;
+      const worldMouseY = mouseY / cam.zoom + cam.y;
+      const angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
+
+      if (player.alive) {
+        player.update(dt, angle);
+      }
+
+      spawnNaturalPellets();
+      checkCollisions();
+
+      // Render
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Camera & zoom scale with mass (dynamic scaling)
+      applyCamera();
+
+      drawArena();
+      for (const p of pellets) p.draw();
+      player.draw();
+
+      if (!player.alive) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('You died! Refresh to restart.', canvas.width / 2, canvas.height / 2);
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function getCamera() {
+      // Zoom out as mass grows
+      const baseZoom = 1.2;
+      const maxZoomOut = 0.4; // minimum zoom factor
+      const z = Math.max(maxZoomOut, baseZoom - player.mass / 2000);
+      return { x: player.x - canvas.width / 2 / z, y: player.y - canvas.height / 2 / z, zoom: z };
+    }
+
+    function applyCamera() {
+      const cam = getCamera();
+      ctx.setTransform(cam.zoom, 0, 0, cam.zoom, -cam.x * cam.zoom, -cam.y * cam.zoom);
+    }
+
+    function drawArena() {
+      // Border circle
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, ARENA_RADIUS, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Light grid for reference (center-heavy -> scavenging feel)
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 1;
+      const step = 200;
+      const min = -ARENA_RADIUS;
+      const max = ARENA_RADIUS;
+      ctx.beginPath();
+      for (let x = min; x <= max; x += step) {
+        ctx.moveTo(x, min);
+        ctx.lineTo(x, max);
+      }
+      for (let y = min; y <= max; y += step) {
+        ctx.moveTo(min, y);
+        ctx.lineTo(max, y);
+      }
+      ctx.stroke();
+    }
+
+    requestAnimationFrame(gameLoop);
+  </script>
 </body>
 </html>
