@@ -3,10 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Main Page</title>
+    <title>Blooket-like Game</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f0f0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .stats { background: #333; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; }
+        .game-mode { margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; transition: 0.3s; }
+        .game-mode:hover { background: #fafafa; }
+        button { cursor: pointer; background: #3a86ff; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
+        button:hover { background: #2a66cc; }
+        .market-btn { background: #fb5607; }
+        .blook-list { font-size: 0.9em; color: #555; margin-top: 10px; font-style: italic; }
+    </style>
+    <script>
+        let tokens = 100;
+        let myBlooks = ["Dog"]; // Starting blook
+
+        // Blook Data (Rarity impacts drop rates)
+        const allBlooks = [
+            { name: "Dog", rarity: "Common", rate: 40 },
+            { name: "Cat", rarity: "Common", rate: 40 },
+            { name: "Owl", rarity: "Uncommon", rate: 20 },
+            { name: "Goldfish", rarity: "Uncommon", rate: 20 },
+            { name: "Dragon", rarity: "Epic", rate: 5 },
+            { name: "Unicorn", rarity: "Epic", rate: 5 },
+            { name: "King", rarity: "Legendary", rate: 1 },
+            { name: "Mega Bot", rarity: "Legendary", rate: 1 }
+        ];
+
+        function updateUI() {
+            document.getElementById('token-count').innerText = tokens;
+            document.getElementById('blook-count').innerText = myBlooks.join(", ");
+        }
+
+        function openMarket() {
+            const cost = 25;
+            if (tokens < cost) {
+                alert("Not enough tokens! You need 25.");
+                return;
+            }
+
+            tokens -= cost;
+            
+            // Logic to pick a random blook based on weight
+            const rand = Math.random() * 100;
+            let cumulative = 0;
+            let wonBlook = allBlooks[0];
+
+            // Shuffle pool simulation
+            const pool = [];
+            allBlooks.forEach(b => {
+                for(let i=0; i<b.rate; i++) pool.push(b);
+            });
+            wonBlook = pool[Math.floor(Math.random() * pool.length)];
+
+            if (!myBlooks.includes(wonBlook.name)) {
+                myBlooks.push(wonBlook.name);
+            }
+            
+            alert(`📦 Market Box Opened!\n\nYou got: ${wonBlook.name.toUpperCase()} (${wonBlook.rarity})`);
+            updateUI();
+        }
+
+        function hostGame() {
+            const questionSet = prompt('Enter the question set name:');
+            alert('Hosting: ' + (questionSet || "General Knowledge"));
+        }
+
+        function playGame(mode) {
+            const code = prompt('Enter 5-digit code:');
+            if (/^\d{5}$/.test(code)) {
+                gameLoop(mode);
+            } else {
+                alert('Invalid code.');
+            }
+        }
+
+        function gameLoop(mode) {
+            let questions = getQuestions(mode);
+            let earned = 0;
+
+            questions.forEach((q) => {
+                let ans = prompt(q.question);
+                earned += 20;
+            });
+
+            tokens += earned;
+            alert('Game Over! You earned ' + earned + ' tokens.');
+            updateUI();
+        }
+
+        function getQuestions(mode) {
+            const questions = {
+                'Gold Quest': [{ question: 'What is 2 + 2?' }],
+                'Tower Defense': [{ question: 'What color is the sky?' }],
+                'Cafe': [{ question: 'Capital of France?' }],
+                'Factory': [{ question: 'Is the earth round?' }]
+            };
+            return questions[mode] || [{question: "What is 1+1?"}];
+        }
+    </script>
 </head>
-<body>
-    <h1>Welcome to My Application</h1>
-    <a href="booklet.html" target="_blank">Open Booklet</a>
+<body onload="updateUI()">
+
+<div class="container">
+    <h1>Blooket Lite</h1>
+    
+    <div class="stats">
+        <span>Tokens: <strong id="token-count">0</strong></span>
+        <button class="market-btn" onclick="openMarket()">Buy Market Box (25 Tokens)</button>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+        <strong>Your Blooks:</strong>
+        <div id="blook-count" class="blook-list"></div>
+    </div>
+
+    <button onclick="hostGame()">Host a Game</button>
+    <hr>
+
+    <div class="game-mode">
+        <strong>Gold Quest</strong> - Steal gold from others!
+        <br><button onclick="playGame('Gold Quest')">Play</button>
+    </div>
+
+    <div class="game-mode">
+        <strong>Tower Defense</strong> - Build towers to survive.
+        <br><button onclick="playGame('Tower Defense')">Play</button>
+    </div>
+
+    <div class="game-mode">
+        <strong>Cafe</strong> - Serve customers quickly.
+        <br><button onclick="playGame('Cafe')">Play</button>
+    </div>
+
+    <div class="game-mode">
+        <strong>Factory</strong> - Produce goods for cash.
+        <br><button onclick="playGame('Factory')">Play</button>
+    </div>
+</div>
+    
 </body>
 </html>
