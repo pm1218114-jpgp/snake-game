@@ -1,147 +1,396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blooket-like Game</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f0f0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .stats { background: #333; color: white; padding: 10px; border-radius: 5px; margin-bottom: 20px; display: flex; justify-content: space-between; }
-        .game-mode { margin: 10px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; transition: 0.3s; }
-        .game-mode:hover { background: #fafafa; }
-        button { cursor: pointer; background: #3a86ff; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
-        button:hover { background: #2a66cc; }
-        .market-btn { background: #fb5607; }
-        .blook-list { font-size: 0.9em; color: #555; margin-top: 10px; font-style: italic; }
-    </style>
-    <script>
-        let tokens = 100;
-        let myBlooks = ["Dog"]; // Starting blook
-
-        // Blook Data (Rarity impacts drop rates)
-        const allBlooks = [
-            { name: "Dog", rarity: "Common", rate: 40 },
-            { name: "Cat", rarity: "Common", rate: 40 },
-            { name: "Owl", rarity: "Uncommon", rate: 20 },
-            { name: "Goldfish", rarity: "Uncommon", rate: 20 },
-            { name: "Dragon", rarity: "Epic", rate: 5 },
-            { name: "Unicorn", rarity: "Epic", rate: 5 },
-            { name: "King", rarity: "Legendary", rate: 1 },
-            { name: "Mega Bot", rarity: "Legendary", rate: 1 }
-        ];
-
-        function updateUI() {
-            document.getElementById('token-count').innerText = tokens;
-            document.getElementById('blook-count').innerText = myBlooks.join(", ");
-        }
-
-        function openMarket() {
-            const cost = 25;
-            if (tokens < cost) {
-                alert("Not enough tokens! You need 25.");
-                return;
-            }
-
-            tokens -= cost;
-            
-            // Logic to pick a random blook based on weight
-            const rand = Math.random() * 100;
-            let cumulative = 0;
-            let wonBlook = allBlooks[0];
-
-            // Shuffle pool simulation
-            const pool = [];
-            allBlooks.forEach(b => {
-                for(let i=0; i<b.rate; i++) pool.push(b);
-            });
-            wonBlook = pool[Math.floor(Math.random() * pool.length)];
-
-            if (!myBlooks.includes(wonBlook.name)) {
-                myBlooks.push(wonBlook.name);
-            }
-            
-            alert(`📦 Market Box Opened!\n\nYou got: ${wonBlook.name.toUpperCase()} (${wonBlook.rarity})`);
-            updateUI();
-        }
-
-        function hostGame() {
-            const questionSet = prompt('Enter the question set name:');
-            alert('Hosting: ' + (questionSet || "General Knowledge"));
-        }
-
-        function playGame(mode) {
-            const code = prompt('Enter 5-digit code:');
-            if (/^\d{5}$/.test(code)) {
-                gameLoop(mode);
-            } else {
-                alert('Invalid code.');
-            }
-        }
-
-        function gameLoop(mode) {
-            let questions = getQuestions(mode);
-            let earned = 0;
-
-            questions.forEach((q) => {
-                let ans = prompt(q.question);
-                earned += 20;
-            });
-
-            tokens += earned;
-            alert('Game Over! You earned ' + earned + ' tokens.');
-            updateUI();
-        }
-
-        function getQuestions(mode) {
-            const questions = {
-                'Gold Quest': [{ question: 'What is 2 + 2?' }],
-                'Tower Defense': [{ question: 'What color is the sky?' }],
-                'Cafe': [{ question: 'Capital of France?' }],
-                'Factory': [{ question: 'Is the earth round?' }]
-            };
-            return questions[mode] || [{question: "What is 1+1?"}];
-        }
-    </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz Market Game</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Arial, sans-serif; background: #111827; color: #fff; }
+    .container { max-width: 1200px; margin: auto; padding: 20px; }
+    h1, h2, h3, p { margin: 8px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card { background: #1f2937; border-radius: 16px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+    button, select, input { border: none; border-radius: 10px; padding: 10px 12px; margin: 4px; font-size: 14px; }
+    button { cursor: pointer; font-weight: 700; }
+    .green { background: #22c55e; color: #fff; }
+    .blue { background: #3b82f6; color: #fff; }
+    .orange { background: #f59e0b; color: #fff; }
+    .purple { background: #a855f7; color: #fff; }
+    .red { background: #ef4444; color: #fff; }
+    .answer { display: block; width: 100%; background: #2563eb; color: #fff; margin: 8px 0; }
+    .item { background: #374151; border-radius: 12px; padding: 10px; margin: 8px 0; }
+    .log { min-height: 100px; background: #0f172a; border-radius: 12px; padding: 12px; white-space: pre-line; }
+    .Common { color: #86efac; }
+    .Uncommon { color: #67e8f9; }
+    .Rare { color: #93c5fd; }
+    .Epic { color: #d8b4fe; }
+    .Legendary { color: #fde047; }
+    .Chroma { color: #fb7185; }
+    .Mystical { color: #f43f5e; }
+    .topbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  </style>
 </head>
-<body onload="updateUI()">
+<body>
+  <div class="container">
+    <h1>Blook-Style Quiz Game</h1>
+    <p>One HTML file with quiz modes, market, packs, weekly shop, inventory, duplicates, and save data.</p>
 
-<div class="container">
-    <h1>Blooket Lite</h1>
-    
-    <div class="stats">
-        <span>Tokens: <strong id="token-count">0</strong></span>
-        <button class="market-btn" onclick="openMarket()">Buy Market Box (25 Tokens)</button>
+    <div class="grid">
+      <div class="card">
+        <h2>Game Setup</h2>
+        <div class="topbar">
+          <select id="modeSelect">
+            <option>Blook Rush</option>
+            <option>Gold Quest</option>
+            <option>Factory</option>
+            <option>Cafe</option>
+            <option>Tower Defense</option>
+          </select>
+          <select id="winSelect">
+            <option value="time">Time-Based</option>
+            <option value="goal">Goal-Based</option>
+          </select>
+          <input id="goalInput" type="number" value="300" min="50">
+          <button class="blue" onclick="applySettings()">Apply</button>
+          <button class="green" onclick="startGame()">Start</button>
+          <button class="red" onclick="stopGame()">Stop</button>
+        </div>
+        <p><strong>Mode:</strong> <span id="modeText"></span></p>
+        <p><strong>Goal:</strong> <span id="goalText"></span></p>
+        <p><strong>Time Left:</strong> <span id="timeText"></span></p>
+      </div>
+
+      <div class="card">
+        <h2>Player Stats</h2>
+        <p><strong>Tokens:</strong> <span id="tokensText"></span></p>
+        <p><strong>XP:</strong> <span id="xpText"></span></p>
+        <p><strong>Score:</strong> <span id="scoreText"></span></p>
+        <p><strong>Gold:</strong> <span id="goldText"></span></p>
+        <p><strong>Factory:</strong> <span id="factoryText"></span></p>
+        <p><strong>Cafe:</strong> <span id="cafeText"></span></p>
+        <p><strong>Tower:</strong> <span id="towerText"></span></p>
+        <p><strong>Blook:</strong> <span id="blookText"></span></p>
+      </div>
+
+      <div class="card">
+        <h2>Quiz</h2>
+        <p id="questionText">Press Start to begin.</p>
+        <div id="answersBox"></div>
+      </div>
+
+      <div class="card">
+        <h2>Market Packs</h2>
+        <div class="item">Farm Pack - 20 <button class="green" onclick="openPack('Farm',20)">Open</button></div>
+        <div class="item">Forest Pack - 20 <button class="green" onclick="openPack('Forest',20)">Open</button></div>
+        <div class="item">Safari Pack - 25 <button class="green" onclick="openPack('Safari',25)">Open</button></div>
+        <div class="item">Spooky Pack - 30 <button class="green" onclick="openPack('Spooky',30)">Open</button></div>
+        <div class="item">Breakfast Pack - 35 <button class="green" onclick="openPack('Breakfast',35)">Open</button></div>
+        <div class="item">Space Pack - 40 <button class="green" onclick="openPack('Space',40)">Open</button></div>
+        <button class="blue" onclick="bulkOpen('Farm',20,5)">Open 5 Farm</button>
+        <button class="blue" onclick="bulkOpen('Safari',25,5)">Open 5 Safari</button>
+      </div>
+
+      <div class="card">
+        <h2>Weekly Shop</h2>
+        <div id="shopBox"></div>
+      </div>
+
+      <div class="card">
+        <h2>Inventory</h2>
+        <div id="inventoryBox"></div>
+        <button class="orange" onclick="sellDuplicates()">Sell Duplicates</button>
+      </div>
+
+      <div class="card">
+        <h2>Save</h2>
+        <button class="purple" onclick="saveGame()">Save Game</button>
+        <button class="purple" onclick="loadGame()">Load Game</button>
+        <button class="red" onclick="resetGame()">Reset</button>
+      </div>
+
+      <div class="card">
+        <h2>Log</h2>
+        <div id="logBox" class="log">Welcome!</div>
+      </div>
     </div>
+  </div>
 
-    <div style="margin-bottom: 20px;">
-        <strong>Your Blooks:</strong>
-        <div id="blook-count" class="blook-list"></div>
-    </div>
+  <script>
+    const questions = [
+      { q: 'What is 6 x 7?', a: ['42','36','48','56'], c: '42' },
+      { q: 'Which planet is known as the Red Planet?', a: ['Mars','Earth','Venus','Saturn'], c: 'Mars' },
+      { q: 'What color is made by mixing blue and yellow?', a: ['Purple','Green','Orange','Red'], c: 'Green' },
+      { q: 'What is the capital of Italy?', a: ['Rome','Paris','Madrid','Lisbon'], c: 'Rome' },
+      { q: 'How many sides does a hexagon have?', a: ['5','6','7','8'], c: '6' }
+    ];
 
-    <button onclick="hostGame()">Host a Game</button>
-    <hr>
+    const packs = {
+      Farm: [
+        { name:'Chick', rarity:'Common', chance:20, sell:2 }, { name:'Chicken', rarity:'Common', chance:18, sell:2 },
+        { name:'Cow', rarity:'Common', chance:18, sell:2 }, { name:'Pig', rarity:'Common', chance:16, sell:2 },
+        { name:'Rabbit', rarity:'Common', chance:12, sell:3 }, { name:'Sheep', rarity:'Common', chance:10, sell:3 },
+        { name:'Bear', rarity:'Rare', chance:4, sell:10 }, { name:'Fox', rarity:'Rare', chance:2, sell:10 }
+      ],
+      Forest: [
+        { name:'Raccoon', rarity:'Common', chance:24, sell:2 }, { name:'Owl', rarity:'Common', chance:24, sell:2 },
+        { name:'Hedgehog', rarity:'Common', chance:20, sell:2 }, { name:'Ghost', rarity:'Rare', chance:8, sell:10 },
+        { name:'Werewolf', rarity:'Epic', chance:3, sell:20 }, { name:'Lovely Fox', rarity:'Chroma', chance:0.5, sell:75 }
+      ],
+      Safari: [
+        { name:'Tiger', rarity:'Common', chance:16, sell:2 }, { name:'Parrot', rarity:'Common', chance:15, sell:2 },
+        { name:'Toucan', rarity:'Common', chance:15, sell:2 }, { name:'Gorilla', rarity:'Common', chance:12, sell:2 },
+        { name:'Panda', rarity:'Uncommon', chance:10, sell:5 }, { name:'Zebra', rarity:'Uncommon', chance:10, sell:5 },
+        { name:'Rhino', rarity:'Rare', chance:5, sell:10 }, { name:'Giraffe', rarity:'Rare', chance:4, sell:10 },
+        { name:'Rainbow Panda', rarity:'Chroma', chance:0.5, sell:100 }
+      ],
+      Spooky: [
+        { name:'Frankenstein', rarity:'Common', chance:25, sell:2 }, { name:'Pumpkin', rarity:'Common', chance:25, sell:2 },
+        { name:'Swamp Monster', rarity:'Common', chance:20, sell:3 }, { name:'Vampire', rarity:'Common', chance:15, sell:3 },
+        { name:'Ghost', rarity:'Rare', chance:8, sell:10 }, { name:'Werewolf', rarity:'Epic', chance:4, sell:20 },
+        { name:'Spooky Ghost', rarity:'Mystical', chance:0.2, sell:0 }
+      ],
+      Breakfast: [
+        { name:'Toast', rarity:'Epic', chance:20, sell:20 }, { name:'Yogurt', rarity:'Epic', chance:20, sell:20 },
+        { name:'Pancakes', rarity:'Rare', chance:25, sell:12 }, { name:'Milk', rarity:'Uncommon', chance:30, sell:5 },
+        { name:'Waffle', rarity:'Rare', chance:4, sell:15 }
+      ],
+      Space: [
+        { name:'Mega Bot', rarity:'Legendary', chance:2, sell:80 }, { name:'Red Astronaut', rarity:'Chroma', chance:1, sell:100 },
+        { name:'Blue Astronaut', rarity:'Chroma', chance:1, sell:100 }, { name:'Green Astronaut', rarity:'Chroma', chance:1, sell:100 },
+        { name:'Pink Astronaut', rarity:'Chroma', chance:1, sell:100 }, { name:'Rainbow Astronaut', rarity:'Mystical', chance:0.2, sell:0 },
+        { name:'Tim the Alien', rarity:'Mystical', chance:0.2, sell:0 }, { name:'Alien', rarity:'Rare', chance:15, sell:12 },
+        { name:'Astronaut', rarity:'Epic', chance:10, sell:25 }
+      ]
+    };
 
-    <div class="game-mode">
-        <strong>Gold Quest</strong> - Steal gold from others!
-        <br><button onclick="playGame('Gold Quest')">Play</button>
-    </div>
+    const weeklyItems = [
+      { name:'Galaxy Banner', price:120 },
+      { name:'Champion Title', price:180 },
+      { name:'Robot Head Part', price:150 },
+      { name:'Golden Frame', price:220 }
+    ];
 
-    <div class="game-mode">
-        <strong>Tower Defense</strong> - Build towers to survive.
-        <br><button onclick="playGame('Tower Defense')">Play</button>
-    </div>
+    let game = {
+      tokens: 500, xp: 0, score: 0, gold: 0, factory: 0, cafe: 0, tower: 0,
+      blook: 'Chick', inventory: { 'Chick|Common': 1 },
+      mode: 'Blook Rush', winType: 'time', goal: 300,
+      time: 60, running: false, qIndex: 0, timer: null
+    };
 
-    <div class="game-mode">
-        <strong>Cafe</strong> - Serve customers quickly.
-        <br><button onclick="playGame('Cafe')">Play</button>
-    </div>
+    function weightedPick(list) {
+      const total = list.reduce((s, item) => s + item.chance, 0);
+      let rand = Math.random() * total;
+      for (const item of list) {
+        if (rand < item.chance) return item;
+        rand -= item.chance;
+      }
+      return list[0];
+    }
 
-    <div class="game-mode">
-        <strong>Factory</strong> - Produce goods for cash.
-        <br><button onclick="playGame('Factory')">Play</button>
-    </div>
-</div>
-    
+    function applySettings() {
+      game.mode = document.getElementById('modeSelect').value;
+      game.winType = document.getElementById('winSelect').value;
+      game.goal = Number(document.getElementById('goalInput').value) || 300;
+      render();
+      log(`Mode set to ${game.mode}.`);
+    }
+
+    function startGame() {
+      if (game.running) return;
+      game.running = true;
+      game.time = 60;
+      game.qIndex = 0;
+      nextQuestion();
+      game.timer = setInterval(() => {
+        game.time--;
+        render();
+        if (game.time <= 0) endGame('Time is up!');
+      }, 1000);
+      log('Game started.');
+      render();
+    }
+
+    function stopGame() {
+      clearInterval(game.timer);
+      game.running = false;
+      log('Game stopped.');
+      render();
+    }
+
+    function endGame(msg) {
+      clearInterval(game.timer);
+      game.running = false;
+      document.getElementById('questionText').textContent = msg;
+      document.getElementById('answersBox').innerHTML = '';
+      render();
+      log(msg + ' Final value: ' + getMetric());
+    }
+
+    function getMetric() {
+      if (game.mode === 'Gold Quest') return game.gold;
+      if (game.mode === 'Factory') return game.factory;
+      if (game.mode === 'Cafe') return game.cafe;
+      if (game.mode === 'Tower Defense') return game.tower;
+      return game.score;
+    }
+
+    function nextQuestion() {
+      const q = questions[game.qIndex % questions.length];
+      document.getElementById('questionText').textContent = q.q;
+      document.getElementById('answersBox').innerHTML = q.a.map(ans =>
+        `<button class="answer" onclick="answerQuestion('${ans}')">${ans}</button>`
+      ).join('');
+    }
+
+    function answerQuestion(ans) {
+      if (!game.running) return;
+      const q = questions[game.qIndex % questions.length];
+      if (ans === q.c) {
+        game.tokens += 15;
+        game.xp += 10;
+        game.score += 20;
+        if (game.mode === 'Gold Quest') game.gold += Math.floor(Math.random() * 40) + 20;
+        if (game.mode === 'Factory') game.factory += 15;
+        if (game.mode === 'Cafe') game.cafe += 3;
+        if (game.mode === 'Tower Defense') game.tower += 12;
+        if (game.mode === 'Blook Rush') game.score += 25;
+        log('Correct answer! Reward earned.');
+      } else {
+        game.score = Math.max(0, game.score - 10);
+        game.time = Math.max(0, game.time - 3);
+        if (game.mode === 'Gold Quest') game.gold = Math.max(0, game.gold - 10);
+        log('Incorrect answer. Lost momentum.');
+      }
+      game.qIndex++;
+      render();
+      if (game.winType === 'goal' && getMetric() >= game.goal) {
+        endGame('You reached the goal and won!');
+        return;
+      }
+      nextQuestion();
+    }
+
+    function openPack(packName, cost) {
+      if (game.tokens < cost) return log('Not enough tokens.');
+      game.tokens -= cost;
+      const item = weightedPick(packs[packName]);
+      game.blook = item.name;
+      const key = item.name + '|' + item.rarity;
+      game.inventory[key] = (game.inventory[key] || 0) + 1;
+      render();
+      log(`Opened ${packName} Pack: ${item.name} (${item.rarity})`);
+    }
+
+    function bulkOpen(packName, cost, amount) {
+      if (game.tokens < cost * amount) return log('Not enough tokens.');
+      let found = {};
+      for (let i = 0; i < amount; i++) {
+        game.tokens -= cost;
+        const item = weightedPick(packs[packName]);
+        game.blook = item.name;
+        const key = item.name + '|' + item.rarity;
+        game.inventory[key] = (game.inventory[key] || 0) + 1;
+        found[item.name] = (found[item.name] || 0) + 1;
+      }
+      render();
+      log('Bulk opened: ' + Object.entries(found).map(([n,c]) => `${n} x${c}`).join(', '));
+    }
+
+    function sellDuplicates() {
+      let earned = 0;
+      for (const pack in packs) {
+        for (const item of packs[pack]) {
+          const key = item.name + '|' + item.rarity;
+          const count = game.inventory[key] || 0;
+          if (count > 1 && item.sell > 0) {
+            earned += (count - 1) * item.sell;
+            game.inventory[key] = 1;
+          }
+        }
+      }
+      game.tokens += earned;
+      render();
+      log(earned > 0 ? `Sold duplicates for ${earned} tokens.` : 'No duplicates to sell.');
+    }
+
+    function buyItem(name, price) {
+      if (game.tokens < price) return log('Not enough tokens.');
+      game.tokens -= price;
+      render();
+      log(`Bought ${name}.`);
+    }
+
+    function saveGame() {
+      const copy = { ...game, timer: null, running: false };
+      localStorage.setItem('blookGameSave', JSON.stringify(copy));
+      log('Game saved.');
+    }
+
+    function loadGame() {
+      const save = localStorage.getItem('blookGameSave');
+      if (!save) return log('No save found.');
+      clearInterval(game.timer);
+      game = JSON.parse(save);
+      game.timer = null;
+      game.running = false;
+      render();
+      log('Game loaded.');
+    }
+
+    function resetGame() {
+      clearInterval(game.timer);
+      localStorage.removeItem('blookGameSave');
+      game = {
+        tokens: 500, xp: 0, score: 0, gold: 0, factory: 0, cafe: 0, tower: 0,
+        blook: 'Chick', inventory: { 'Chick|Common': 1 },
+        mode: 'Blook Rush', winType: 'time', goal: 300,
+        time: 60, running: false, qIndex: 0, timer: null
+      };
+      render();
+      document.getElementById('questionText').textContent = 'Press Start to begin.';
+      document.getElementById('answersBox').innerHTML = '';
+      log('Game reset.');
+    }
+
+    function renderShop() {
+      document.getElementById('shopBox').innerHTML = weeklyItems.map(item =>
+        `<div class="item">${item.name} - ${item.price} <button class="purple" onclick="buyItem('${item.name}',${item.price})">Buy</button></div>`
+      ).join('');
+    }
+
+    function renderInventory() {
+      const list = Object.entries(game.inventory);
+      document.getElementById('inventoryBox').innerHTML = list.length
+        ? list.map(([key,count]) => {
+            const [name, rarity] = key.split('|');
+            return `<div class="item">${name} - <span class="${rarity}">${rarity}</span> x${count}</div>`;
+          }).join('')
+        : 'No blooks yet.';
+    }
+
+    function render() {
+      document.getElementById('modeText').textContent = game.mode;
+      document.getElementById('goalText').textContent = game.winType === 'goal' ? `Reach ${game.goal}` : 'Have the highest final value';
+      document.getElementById('timeText').textContent = game.time;
+      document.getElementById('tokensText').textContent = game.tokens;
+      document.getElementById('xpText').textContent = game.xp;
+      document.getElementById('scoreText').textContent = game.score;
+      document.getElementById('goldText').textContent = game.gold;
+      document.getElementById('factoryText').textContent = game.factory;
+      document.getElementById('cafeText').textContent = game.cafe;
+      document.getElementById('towerText').textContent = game.tower;
+      document.getElementById('blookText').textContent = game.blook;
+      renderInventory();
+    }
+
+    function log(text) {
+      document.getElementById('logBox').textContent = text;
+    }
+
+    renderShop();
+    applySettings();
+    render();
+  </script>
 </body>
 </html>
