@@ -1,526 +1,315 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Blooket-style Game Engine Deluxe</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Clicker Clone</title>
     <style>
-        :root {
-            --primary: #4caf50;
-            --secondary: #2196f3;
-            --accent: #ff9800;
-            --danger: #f44336;
-            --warning: #ffc107;
-            --success: #2e7d32;
-            --dark: #1f2937;
-            --dark-2: #111827;
-            --bg: #eef2f7;
-            --panel: #ffffff;
-            --muted: #6b7280;
-            --text: #1f2937;
-            --border: #dfe6ee;
-            --shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
-            --radius: 16px;
-            --common: #9e9e9e;
-            --uncommon: #4caf50;
-            --rare: #2196f3;
-            --epic: #9c27b0;
-            --legendary: #ff9800;
-            --chroma: #e91e63;
-            --mystical: #00bcd4;
-        }
-        * { box-sizing: border-box; }
-        html, body {
-            margin: 0; padding: 0; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(180deg, #f7fafc 0%, #eef2f7 100%); color: var(--text);
-            min-height: 100vh;
-        }
-        /* Add additional styles here */
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #cookie { font-size: 50px; cursor: pointer; }
+        .building { margin: 10px; }
+        #milkBar { height: 20px; background-color: lightblue; width: 100%; position: fixed; bottom: 0; left: 0; }
     </style>
 </head>
 <body>
-    <div id="animation-overlay" class="hidden">
-        <div class="reveal-box">
-            <h1 id="reveal-rarity">REVEALING...</h1>
-            <div id="reveal-card" class="blook-card" style="background: white; width: 100%; margin: 16px 0;">
-                <span id="reveal-emoji" class="blook-emoji">❓</span>
-                <div id="reveal-name" style="font-size: 1.5rem; font-weight: bold;">?</div>
-                <div id="reveal-pack" class="muted" style="margin-top:6px;">Unknown Pack</div>
-            </div>
-            <div id="reveal-extra" class="muted" style="margin-bottom: 14px;">A new Blook has appeared!</div>
-            <button class="btn btn-main" onclick="closeReveal()">COLLECT</button>
-        </div>
+    <h1>Cookie Clicker Clone</h1>
+    <div id="milkBar"></div>
+    <div id="cookie" onclick="clickCookie()">🍪</div>
+    <p>Cookies: <span id="cookieCount">0</span></p>
+    <p>Achievements: <span id="achievementCount">0</span></p>
+    
+    <div class="building">
+        <button onclick="buyBuilding('cursor')">Buy Cursor (Cost: <span id="cursorCost">15</span>)</button>
+        <p>Cursors: <span id="cursorCount">0</span> (CpS: <span id="cursorCpS">0</span>)</p>
     </div>
-    <div id="toast-container"></div>
-    <div id="modal-gift" class="modal">
-        <div class="modal-content">
-            <div class="space-between">
-                <h2>Gift Tokens</h2>
-                <button class="btn btn-ghost" onclick="closeModal('gift')">Close</button>
-            </div>
-            <p class="muted">Send yourself a practice gift to test UI systems.</p>
-            <div class="row">
-                <input id="gift-name" class="input" placeholder="Recipient name" value="Player" />
-                <input id="gift-amount" class="input" type="number" min="1" max="500" value="25" />
-                <button class="btn btn-main" onclick="sendGift()">Send</button>
-            </div>
-        </div>
+    
+    <div class="building">
+        <button onclick="buyBuilding('grandma')">Buy Grandma (Cost: <span id="grandmaCost">100</span>)</button>
+        <p>Grandmas: <span id="grandmaCount">0</span> (CpS: <span id="grandmaCpS">0</span>)</p>
     </div>
-    <div id="modal-import" class="modal">
-        <div class="modal-content">
-            <div class="space-between">
-                <h2>Import Save</h2>
-                <button class="btn btn-ghost" onclick="closeModal('import')">Close</button>
-            </div>
-            <p class="muted">Paste exported save data below.</p>
-            <textarea id="import-data" class="input" style="min-height: 220px; resize: vertical;"></textarea>
-            <div class="row" style="margin-top: 12px;">
-                <button class="btn btn-secondary" onclick="importSaveData()">Import Save</button>
-            </div>
-        </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('farm')">Buy Farm (Cost: <span id="farmCost">1100</span>)</button>
+        <p>Farms: <span id="farmCount">0</span> (CpS: <span id="farmCpS">0</span>)</p>
     </div>
-    <nav class="navbar">
-        <div class="logo">🚀 <strong>Blook Engine Deluxe</strong></div>
-        <div class="navbar-center">
-            <div class="stats-pill">Tokens: <span id="token-count">0</span></div>
-            <div class="stats-pill">Blooks: <span id="blook-count">0</span></div>
-            <div class="stats-pill">Level: <span id="player-level">1</span></div>
-            <div class="stats-pill">XP: <span id="player-xp">0</span></div>
-            <div class="stats-pill">Streak: <span id="correct-streak">0</span></div>
-        </div>
-        <div class="nav-links">
-            <button onclick="showView('menu')">Home</button>
-            <button onclick="showView('play')">Play</button>
-            <button onclick="showView('modes')">Modes</button>
-            <button onclick="showView('shop')">Market</button>
-            <button onclick="showView('inventory')">Collection</button>
-            <button onclick="showView('quests')">Quests</button>
-            <button onclick="showView('craft')">Craft</button>
-            <button onclick="showView('leaderboard')">Ranks</button>
-            <button onclick="showView('profile')">Profile</button>
-            <button onclick="showView('settings')">Settings</button>
-        </div>
-    </nav>
-    <div class="container">
-        <div id="view-menu" class="view">
-            <div class="card hero">
-                <div class="badge">✨ Major expansion loaded</div>
-                <h1>Welcome, Blook Master!</h1>
-                <p>Earn tokens by answering trivia, level up your profile, complete quests, unlock achievements, open themed packs, craft duplicate Blooks into shards, and build the ultimate collection.</p>
-                <div class="row">
-                    <button class="btn btn-main" onclick="showView('play')">Start Trivia</button>
-                    <button class="btn btn-shop" onclick="showView('shop')">Open Packs</button>
-                    <button class="btn btn-secondary" onclick="showView('quests')">View Quests</button>
-                    <button class="btn btn-dark" onclick="showView('profile')">Player Profile</button>
-                </div>
-            </div>
-            <div class="stats-grid card">
-                <div class="stat-box">
-                    <div class="stat-label">Tokens</div>
-                    <div class="stat-value" id="menu-tokens">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Collection Size</div>
-                    <div class="stat-value" id="menu-blooks">0</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Player Level</div>
-                    <div class="stat-value" id="menu-level">1</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-label">Best Streak</div>
-                    <div class="stat-value" id="menu-best-streak">0</div>
-                </div>
-            </div>
-            <div class="grid-2">
-                <div class="card">
-                    <div class="section-title">
-                        <h2>Current Odds & Values</h2>
-                        <span class="muted">Approximate display odds</span>
-                    </div>
-                    <table>
-                        <tr><th>Rarity</th><th>Sell Value</th><th>Color Tier</th></tr>
-                        <tr><td>Common</td><td>2 Tokens</td><td>Gray</td></tr>
-                        <tr><td>Uncommon</td><td>5 Tokens</td><td>Green</td></tr>
-                        <tr><td>Rare</td><td>20 Tokens</td><td>Blue</td></tr>
-                        <tr><td>Epic</td><td>75 Tokens</td><td>Purple</td></tr>
-                        <tr><td>Legendary</td><td>200 Tokens</td><td>Orange</td></tr>
-                        <tr><td>Chroma</td><td>1000 Tokens</td><td>Pink</td></tr>
-                        <tr><td>Mystical</td><td>2500 Tokens</td><td>Cyan</td></tr>
-                    </table>
-                </div>
-                <div class="card">
-                    <div class="section-title">
-                        <h2>Daily Snapshot</h2>
-                    </div>
-                    <div class="daily-grid">
-                        <div class="mini-card">
-                            <strong>Daily Reward</strong>
-                            <p class="muted">Claim free tokens once per day.</p>
-                            <button id="daily-claim-btn" class="btn btn-main" onclick="claimDailyReward()">Claim Reward</button>
-                        </div>
-                        <div class="mini-card">
-                            <strong>Quick Actions</strong>
-                            <div class="row">
-                                <button class="btn btn-ghost" onclick="showRandomTip()">Tip</button>
-                                <button class="btn btn-ghost" onclick="openModal('gift')">Gift</button>
-                            </div>
-                        </div>
-                        <div class="mini-card">
-                            <strong>Featured Pack</strong>
-                            <p id="featured-pack" class="muted">Loading featured pack...</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="grid-3">
-                <div class="card"><h3>Recent Activity</h3><div id="activity-log"></div></div>
-                <div class="card"><h3>Achievement Highlights</h3><div id="achievement-preview"></div></div>
-                <div class="card"><h3>Collection Breakdown</h3><div id="collection-breakdown"></div></div>
-            </div>
-        </div>
-        <div id="view-play" class="view hidden">
-            <div class="grid-2">
-                <div class="card question-box">
-                    <div id="game-ui">
-                        <div class="question-meta">
-                            <span class="pill">Mode: <span id="current-mode-label">Classic</span></span>
-                            <span class="pill">Question #<span id="question-number">1</span></span>
-                            <span class="pill">Correct: <span id="correct-count">0</span></span>
-                            <span class="pill">Wrong: <span id="wrong-count">0</span></span>
-                        </div>
-                        <div class="timer-wrap">
-                            <div id="timer-bar" class="timer-bar"></div>
-                        </div>
-                        <h2 id="question-text">Loading Question...</h2>
-                        <div class="options-grid" id="options-container"></div>
-                    </div>
-                    <div id="feedback" style="margin-top: 20px; font-weight: bold; font-size: 1.2rem;"></div>
-                    <div class="row" style="justify-content:center; margin-top:16px;">
-                        <button class="btn btn-main" onclick="startTrivia()">New Question</button>
-                        <button class="btn btn-secondary" onclick="useHint()">Use Hint</button>
-                        <button class="btn btn-ghost" onclick="skipQuestion()">Skip</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <h3>Trivia Session</h3>
-                    <div class="mini-card">
-                        <div class="space-between"><span>Coins Earned</span><strong id="session-earned">0</strong></div>
-                        <div class="space-between"><span>XP Earned</span><strong id="session-xp">0</strong></div>
-                        <div class="space-between"><span>Accuracy</span><strong id="session-accuracy">0%</strong></div>
-                    </div>
-                    <div class="mini-card" style="margin-top: 12px;">
-                        <strong>Powerups</strong>
-                        <p class="muted">Hints remove two incorrect answers in most 4-option questions.</p>
-                        <div class="row">
-                            <span class="pill">Hints: <span id="hint-count">0</span></span>
-                            <span class="pill">Skips: <span id="skip-count">0</span></span>
-                        </div>
-                    </div>
-                    <div class="mini-card" style="margin-top: 12px;">
-                        <strong>Current Multipliers</strong>
-                        <div class="pill-row">
-                            <span class="pill">Streak Bonus: x<span id="streak-multiplier">1</span></span>
-                            <span class="pill">Mode Bonus: x<span id="mode-multiplier">1</span></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="view-modes" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Game Modes</h2>
-                    <span class="muted">Choose how you want to play.</span>
-                </div>
-                <div class="mode-grid" id="mode-grid"></div>
-            </div>
-        </div>
-        <div id="view-shop" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Marketplace</h2>
-                    <div class="row">
-                        <select id="shop-filter" class="select" onchange="renderShop()">
-                            <option value="all">All Packs</option>
-                            <option value="cheap">Budget Packs</option>
-                            <option value="premium">Premium Packs</option>
-                        </select>
-                        <button class="btn btn-ghost" onclick="buyFeaturedPack()">Buy Featured</button>
-                    </div>
-                </div>
-                <p>Spend your tokens to unlock new Blooks. Duplicate pulls convert into collection progress and crafting value.</p>
-                <div class="pack-container" id="pack-container"></div>
-            </div>
-        </div>
-        <div id="view-inventory" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Your Collection</h2>
-                    <div class="row">
-                        <input id="inventory-search" class="input" placeholder="Search blooks..." oninput="renderInventory()" />
-                        <select id="inventory-sort" class="select" onchange="renderInventory()">
-                            <option value="newest">Sort: Newest</option>
-                            <option value="name">Sort: Name</option>
-                            <option value="rarity">Sort: Rarity</option>
-                            <option value="duplicates">Sort: Duplicates</option>
-                        </select>
-                        <button class="btn btn-ghost" onclick="sellAllDuplicates()">Sell Duplicates</button>
-                    </div>
-                </div>
-                <div class="inventory-toolbar" id="inventory-summary"></div>
-                <div class="blook-grid" id="inventory-grid"></div>
-            </div>
-        </div>
-        <div id="view-quests" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Daily & Lifetime Quests</h2>
-                    <button class="btn btn-ghost" onclick="refreshDailyQuests()">Refresh Daily</button>
-                </div>
-                <div id="quest-list"></div>
-            </div>
-            <div class="card">
-                <h2>Achievements</h2>
-                <div id="achievement-list" class="achievement-grid"></div>
-            </div>
-        </div>
-        <div id="view-craft" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Crafting Lab</h2>
-                    <span class="muted">Convert duplicates into shards, then craft rewards.</span>
-                </div>
-                <div class="craft-grid">
-                    <div class="mini-card">
-                        <h3>Resources</h3>
-                        <div class="space-between"><span>Shards</span><strong id="shard-count">0</strong></div>
-                        <div class="space-between"><span>Dust</span><strong id="dust-count">0</strong></div>
-                        <div class="space-between"><span>Scrap</span><strong id="scrap-count">0</strong></div>
-                    </div>
-                    <div class="mini-card">
-                        <h3>Duplicate Converter</h3>
-                        <p class="muted">Turn extra copies into crafting resources.</p>
-                        <button class="btn btn-main" onclick="convertDuplicatesToShards()">Convert Duplicates</button>
-                    </div>
-                    <div class="mini-card">
-                        <h3>Craft Rewards</h3>
-                        <div class="row">
-                            <button class="btn btn-secondary" onclick="craftHint()">Craft Hint</button>
-                            <button class="btn btn-secondary" onclick="craftSkip()">Craft Skip</button>
-                            <button class="btn btn-shop" onclick="craftTokens()">Craft Tokens</button>
-                        </div>
-                    </div>
-                </div>
-                <div id="craft-log" style="margin-top: 18px;"></div>
-            </div>
-        </div>
-        <div id="view-leaderboard" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Local Leaderboard</h2>
-                    <button class="btn btn-ghost" onclick="simulateLeaderboard()">Refresh AI Scores</button>
-                </div>
-                <div id="leaderboard-list" class="leaderboard-grid"></div>
-            </div>
-        </div>
-        <div id="view-profile" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Player Profile</h2>
-                    <button class="btn btn-ghost" onclick="renamePlayerPrompt()">Rename</button>
-                </div>
-                <div class="profile-grid">
-                    <div class="mini-card">
-                        <div class="stat-label">Player Name</div>
-                        <div class="stat-value" id="profile-name" style="font-size:1.4rem;">Player</div>
-                    </div>
-                    <div class="mini-card">
-                        <div class="stat-label">Level</div>
-                        <div class="stat-value" id="profile-level" style="font-size:1.4rem;">1</div>
-                    </div>
-                    <div class="mini-card">
-                        <div class="stat-label">XP To Next Level</div>
-                        <div class="stat-value" id="profile-next-xp" style="font-size:1.4rem;">100</div>
-                    </div>
-                    <div class="mini-card">
-                        <div class="stat-label">Title</div>
-                        <div class="stat-value" id="profile-title" style="font-size:1.1rem;">Rookie Collector</div>
-                    </div>
-                </div>
-                <div class="grid-2">
-                    <div class="card">
-                        <h3>Performance</h3>
-                        <table>
-                            <tr><th>Metric</th><th>Value</th></tr>
-                            <tr><td>Total Questions Answered</td><td id="profile-total-questions">0</td></tr>
-                            <tr><td>Correct Answers</td><td id="profile-correct">0</td></tr>
-                            <tr><td>Incorrect Answers</td><td id="profile-wrong">0</td></tr>
-                            <tr><td>Accuracy</td><td id="profile-accuracy">0%</td></tr>
-                            <tr><td>Highest Streak</td><td id="profile-best-streak">0</td></tr>
-                            <tr><td>Packs Opened</td><td id="profile-packs-opened">0</td></tr>
-                        </table>
-                    </div>
-                    <div class="card">
-                        <h3>Economy</h3>
-                        <table>
-                            <tr><th>Metric</th><th>Value</th></tr>
-                            <tr><td>Tokens Earned</td><td id="profile-tokens-earned">0</td></tr>
-                            <tr><td>Tokens Spent</td><td id="profile-tokens-spent">0</td></tr>
-                            <tr><td>Blooks Sold</td><td id="profile-blooks-sold">0</td></tr>
-                            <tr><td>Shards Crafted</td><td id="profile-shards-earned">0</td></tr>
-                            <tr><td>Daily Rewards Claimed</td><td id="profile-dailies">0</td></tr>
-                            <tr><td>Achievements Unlocked</td><td id="profile-achievements">0</td></tr>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div id="view-settings" class="view hidden">
-            <div class="card">
-                <div class="section-title">
-                    <h2>Settings & Save Tools</h2>
-                </div>
-                <div class="settings-grid">
-                    <div class="mini-card">
-                        <h3>Gameplay</h3>
-                        <label class="row"><input id="toggle-timer" type="checkbox" onchange="toggleSetting('timerEnabled', this.checked)" /> Enable timer</label>
-                        <label class="row"><input id="toggle-sfx" type="checkbox" onchange="toggleSetting('soundEnabled', this.checked)" /> Enable sound effects</label>
-                        <label class="row"><input id="toggle-autosave" type="checkbox" onchange="toggleSetting('autosave', this.checked)" /> Enable autosave</label>
-                    </div>
-                    <div class="mini-card">
-                        <h3>Save Data</h3>
-                        <div class="row">
-                            <button class="btn btn-secondary" onclick="exportSaveData()">Export Save</button>
-                            <button class="btn btn-ghost" onclick="openModal('import')">Import Save</button>
-                        </div>
-                        <div class="row" style="margin-top: 10px;">
-                            <button class="btn btn-danger" onclick="resetGame()">Reset Game</button>
-                        </div>
-                    </div>
-                    <div class="mini-card">
-                        <h3>Customization</h3>
-                        <label class="muted">Player name</label>
-                        <input id="settings-player-name" class="input" placeholder="Enter a player name" />
-                        <div class="row" style="margin-top: 10px;">
-                            <button class="btn btn-main" onclick="savePlayerName()">Save Name</button>
-                            <button class="btn btn-ghost" onclick="applyThemeCycle()">Cycle Theme Accent</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    
+    <div class="building">
+        <button onclick="buyBuilding('factory')">Buy Factory (Cost: <span id="factoryCost">12000</span>)</button>
+        <p>Factories: <span id="factoryCount">0</span> (CpS: <span id="factoryCpS">0</span>)</p>
     </div>
-    <div class="footer-note">Deluxe single-file demo with expanded UI, quests, achievements, crafting, saves, modes, and progression.</div>
+
+    <div class="building">
+        <button onclick="buyBuilding('bank')">Buy Bank (Cost: <span id="bankCost">130000</span>)</button>
+        <p>Banks: <span id="bankCount">0</span> (CpS: <span id="bankCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('temple')">Buy Temple (Cost: <span id="templeCost">1400000</span>)</button>
+        <p>Temples: <span id="templeCount">0</span> (CpS: <span id="templeCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('wizard')">Buy Wizard Tower (Cost: <span id="wizardCost">15000000</span>)</button>
+        <p>Wizard Towers: <span id="wizardCount">0</span> (CpS: <span id="wizardCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('kitten')">Buy Kitten Upgrade (Cost: <span id="kittenCost">100</span>)</button>
+        <p>Kittens: <span id="kittenCount">0</span> (Milk %: <span id="milkPercentage">0</span>)</p>
+    </div>
 
     <script>
-        const STORAGE_KEY = 'blook_engine_deluxe_save_v1';
-        const THEME_COLORS = ['#4caf50', '#2196f3', '#ff9800', '#9c27b0', '#e91e63', '#00bcd4'];
-        const rarityValues = { common: 2, uncommon: 5, rare: 20, epic: 75, legendary: 200, chroma: 1000, mystical: 2500 };
-        const rarityOrder = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, chroma: 6, mystical: 7 };
-        const rarityShardValues = { common: 1, uncommon: 2, rare: 5, epic: 15, legendary: 50, chroma: 150, mystical: 500 };
-        const emojiMap = {
-            "Common Chick": "🐥", "Elf": "🧝", "Witch": "🧙‍♀️", "Wizard": "🧙",
-            "Dragon": "🐉", "Queen": "👑", "King": "🤴", "Mystic King": "💠",
-            "Alien": "👽", "Meteor": "☄️", "UFO": "🛸", "Astronaut": "👨‍🚀",
-            "Pink Cosmonaut": "🩷", "Angry Bot": "🤖", "Buddy Bot": "🔩", 
-            "Brainy Bot": "🧠", "Mega Bot": "🦾", "Alice": "🃏", "White Rabbit": "🐇", 
-            "Cheshire Cat": "😺", "Mad Hatter": "🎩", "King of Hearts": "❤️", 
-            "Pirate Parrot": "🦜", "Treasure Crab": "🦀", "Captain Skull": "☠️", 
-            "Golden Kraken": "🐙", "Sunny Fox": "🦊", "Leaf Deer": "🦌", 
-            "Moss Bear": "🐻", "Spirit Owl": "🦉", "Volcano Imp": "🌋", 
-            "Lava Hound": "🔥", "Inferno Titan": "🗿", "Frost Penguin": "🐧", 
-            "Ice Dragon": "❄️", "Aurora Whale": "🐋", "Myth Egg": "🥚"
-        };
+        let cookieCount = 0, cursorCount = 0, grandmaCount = 0, farmCount = 0, factoryCount = 0, bankCount = 0, templeCount = 0, wizardCount = 0, kittenCount = 0;
+        let cursorCost = 15, grandmaCost = 100, farmCost = 1100, factoryCost = 12000, bankCost = 130000, templeCost = 1400000, wizardCost = 15000000, kittenCost = 100;
+        const cursorBaseCpS = 0.1, grandmaBaseCpS = 1, farmBaseCpS = 8, factoryBaseCpS = 47, bankBaseCpS = 260, templeBaseCpS = 1400, wizardBaseCpS = 7000, milkPerAchievement = 4;
+        let achievementCount = 0, milkPercentage = 0, milkType = 'Plain';
 
-        const questionBank = [
-            { q: "What is the rarest rarity shown in this engine?", a: ["Legendary", "Chroma", "Mystical", "Epic"], correct: 2, category: "Game" },
-            { q: "How many sides does a hexagon have?", a: ["5", "6", "7", "8"], correct: 1, category: "Math" },
-            { q: "Which planet is known as the Red Planet?", a: ["Venus", "Mars", "Jupiter", "Saturn"], correct: 1, category: "Science" },
-            { q: "What is 15 + 27?", a: ["42", "41", "52", "39"], correct: 0, category: "Math" },
-            { q: "What gas do plants absorb from the atmosphere?", a: ["Oxygen", "Nitrogen", "Carbon Dioxide", "Helium"], correct: 2, category: "Science" },
-            { q: "Who painted the Mona Lisa?", a: ["Monet", "Picasso", "Da Vinci", "Van Gogh"], correct: 2, category: "Art" },
-            { q: "What is the capital of Japan?", a: ["Seoul", "Tokyo", "Kyoto", "Osaka"], correct: 1, category: "Geography" },
-            { q: "Which ocean is the largest?", a: ["Atlantic", "Indian", "Arctic", "Pacific"], correct: 3, category: "Geography" },
-            { q: "Which language runs in the browser for this project?", a: ["Python", "JavaScript", "C#", "Java"], correct: 1, category: "Coding" },
-            { q: "How many continents are there?", a: ["5", "6", "7", "8"], correct: 2, category: "Geography" },
-            { q: "Which number is prime?", a: ["21", "27", "29", "33"], correct: 2, category: "Math" },
-            { q: "What is H2O commonly known as?", a: ["Salt", "Water", "Oxygen", "Hydrogen"], correct: 1, category: "Science" },
-            { q: "Who wrote 'Romeo and Juliet'?", a: ["Charles Dickens", "William Shakespeare", "J.K. Rowling", "Mark Twain"], correct: 1, category: "Literature" },
-            { q: "What is 9 x 8?", a: ["72", "81", "64", "69"], correct: 0, category: "Math" },
-            { q: "Which pack contains Mega Bot?", a: ["Space", "Bot", "Medieval", "Pirate"], correct: 1, category: "Game" },
-            { q: "Which animal is known for building dams?", a: ["Otter", "Beaver", "Fox", "Wolf"], correct: 1, category: "Nature" },
-            { q: "What is the boiling point of water at sea level?", a: ["90°C", "95°C", "100°C", "110°C"], correct: 2, category: "Science" },
-            { q: "Which instrument has keys, pedals, and strings?", a: ["Drum", "Violin", "Piano", "Flute"], correct: 2, category: "Music" },
-            { q: "What is the square root of 81?", a: ["8", "9", "7", "6"], correct: 1, category: "Math" },
-            { q: "Which is a mammal?", a: ["Shark", "Dolphin", "Trout", "Octopus"], correct: 1, category: "Nature" },
-            { q: "Which color do you get by mixing red and blue?", a: ["Green", "Orange", "Purple", "Yellow"], correct: 2, category: "Art" },
-            { q: "Which country is famous for the pyramids of Giza?", a: ["Greece", "Egypt", "India", "Mexico"], correct: 1, category: "History" },
-            { q: "How many hours are in two days?", a: ["24", "36", "48", "72"], correct: 2, category: "Math" },
-            { q: "Which celestial body orbits Earth?", a: ["Sun", "Mars", "Moon", "Venus"], correct: 2, category: "Science" },
-            { q: "Which mode usually focuses on steady play with normal rewards?", a: ["Classic", "Impossible", "Rush", "Zen"], correct: 0, category: "Game" },
-            { q: "What does CSS primarily style?", a: ["Server hardware", "Page appearance", "Database tables", "Network cables"], correct: 1, category: "Coding" },
-            { q: "Which pack is themed around stories and whimsy?", a: ["Wonderland", "Bot", "Frost", "Volcano"], correct: 0, category: "Game" },
-            { q: "What is 100 divided by 4?", a: ["20", "25", "40", "50"], correct: 1, category: "Math" },
-            { q: "Which star is closest to Earth?", a: ["Polaris", "Sirius", "The Sun", "Betelgeuse"], correct: 2, category: "Science" },
-            { q: "How many letters are in the English alphabet?", a: ["24", "25", "26", "27"], correct: 2, category: "Language" },
-            // Add more questions to expand the question bank
-        ];
+        function clickCookie() {
+            cookieCount++;
+            document.getElementById('cookieCount').innerText = cookieCount;
+            checkAchievements();
+            updateMilk();
+            updateCpS();
+        }
 
-        const packDefinitions = {
-            Medieval: {
-                cost: 25, featuredWeight: 3, color: 'linear-gradient(135deg, #607d8b, #263238)', 
-                description: 'Kings, dragons, and enchanted rulers.', 
-                blooks: [{ name: 'Elf', rarity: 'uncommon', rate: 0.28 }, { name: 'Witch', rarity: 'uncommon', rate: 0.24 }]
-            },
-            Space: {
-                cost: 25, featuredWeight: 3, color: 'linear-gradient(135deg, #3f51b5, #1a237e)', 
-                description: 'Explore galaxies and cosmic discoveries.', 
-                blooks: [{ name: 'Alien', rarity: 'uncommon', rate: 0.3 }, { name: 'Meteor', rarity: 'uncommon', rate: 0.24 }]
-            },
-            // Add more packs to expand the game
-        };
+        function buyBuilding(type) {
+            if (type === 'cursor' && cookieCount >= cursorCost) {
+                cursorCount++;
+                cookieCount -= cursorCost;
+                cursorCost = Math.floor(cursorCost * 1.15);
+                updateBuilding('cursor', cursorCount, cursorCost, cursorBaseCpS);
+            } else if (type === 'grandma' && cookieCount >= grandmaCost) {
+                grandmaCount++;
+                cookieCount -= grandmaCost;
+                grandmaCost = Math.floor(grandmaCost * 1.15);
+                updateBuilding('grandma', grandmaCount, grandmaCost, grandmaBaseCpS);
+            } else if (type === 'farm' && cookieCount >= farmCost) {
+                farmCount++;
+                cookieCount -= farmCost;
+                farmCost = Math.floor(farmCost * 1.15);
+                updateBuilding('farm', farmCount, farmCost, farmBaseCpS);
+            } else if (type === 'factory' && cookieCount >= factoryCost) {
+                factoryCount++;
+                cookieCount -= factoryCost;
+                factoryCost = Math.floor(factoryCost * 1.15);
+                updateBuilding('factory', factoryCount, factoryCost, factoryBaseCpS);
+            } else if (type === 'bank' && cookieCount >= bankCost) {
+                bankCount++;
+                cookieCount -= bankCost;
+                bankCost = Math.floor(bankCost * 1.15);
+                updateBuilding('bank', bankCount, bankCost, bankBaseCpS);
+            } else if (type === 'temple' && cookieCount >= templeCost) {
+                templeCount++;
+                cookieCount -= templeCost;
+                templeCost = Math.floor(templeCost * 1.15);
+                updateBuilding('temple', templeCount, templeCost, templeBaseCpS);
+            } else if (type === 'wizard' && cookieCount >= wizardCost) {
+                wizardCount++;
+                cookieCount -= wizardCost;
+                wizardCost = Math.floor(wizardCost * 1.15);
+                updateBuilding('wizard', wizardCount, wizardCost, wizardBaseCpS);
+            } else if (type === 'kitten' && cookieCount >= kittenCost) {
+                kittenCount++;
+                cookieCount -= kittenCost;
+                kittenCost = Math.floor(kittenCost * 1.15);
+                updateBuilding('kitten', kittenCount, kittenCost, 0);
+            } else {
+                alert("Not enough cookies or invalid building.");
+                return;
+            }
+            document.getElementById('cookieCount').innerText = cookieCount;
+            updateCpS();
+        }
 
-        const gameModes = {
-            classic: { name: 'Classic', description: 'Balanced timer and standard rewards.', timeLimit: 15, tokenBase: 2, xpBase: 10, multiplier: 1 },
-            rush: { name: 'Rush', description: 'Short timer, boosted rewards.', timeLimit: 8, tokenBase: 3, xpBase: 14, multiplier: 1.4 },
-            zen: { name: 'Zen', description: 'No pressure, no timer, lower rewards.', timeLimit: 0, tokenBase: 1, xpBase: 8, multiplier: 0.8 },
-            impossible: { name: 'Impossible', description: 'Very short timer and stronger bonuses for success.', timeLimit: 5, tokenBase: 5, xpBase: 22, multiplier: 2 },
-            // Add more game modes
-        };
+        function updateBuilding(type, count, cost, baseCpS) {
+            document.getElementById(type + 'Count').innerText = count;
+            document.getElementById(type + 'Cost').innerText = cost;
+        }
 
-        const defaultSave = () => ({
-            profile: { name: 'Player', title: 'Rookie Collector', level: 1, xp: 0, themeIndex: 0 },
-            resources: { tokens: 100, shards: 0, dust: 0, scrap: 0, hints: 3, skips: 2 },
-            collection: [],
-            settings: { timerEnabled: true, soundEnabled: false, autosave: true },
-            stats: { totalQuestions: 0, correctAnswers: 0, wrongAnswers: 0, bestStreak: 0, currentStreak: 0, totalTokensEarned: 0, totalTokensSpent: 0, packsOpened: 0, blooksSold: 0, shardsEarned: 0, dailyRewardsClaimed: 0, hintsUsed: 0, skipsUsed: 0, craftedItems: 0, sessionEarned: 0, sessionXP: 0, lastDailyClaim: null, selectedMode: 'classic' },
-            quests: { dailySeed: new Date().toDateString(), daily: [], lifetime: [] },
-            achievements: [],
-            activity: [],
-            leaderboard: [],
-            flags: { featuredPack: 'Medieval' }
-        });
+        function updateCpS() {
+            const totalCpS = (cursorCount * cursorBaseCpS) + (grandmaCount * grandmaBaseCpS) + (farmCount * farmBaseCpS) +
+                             (factoryCount * factoryBaseCpS) + (bankCount * bankBaseCpS) + (templeCount * templeBaseCpS) +
+                             (wizardCount * wizardBaseCpS) + (kittenCount * (milkPercentage / 100));
+            setInterval(() => {
+                cookieCount += totalCpS;
+                document.getElementById('cookieCount').innerText = cookieCount;
+            }, 1000);
+        }
 
-        let game = defaultSave();
-        let currentQuestion = null;
-        let currentQuestionIndex = 0;
-        let timerInterval = null;
-        let timeRemaining = 0;
-        let hintUsedThisQuestion = false;
+        function checkAchievements() {
+            while (cookieCount >= 100 * (achievementCount + 1)) {
+                achievementCount++;
+                document.getElementById('achievementCount').innerText = achievementCount;
+                updateMilk();
+            }
+        }
 
-        // Function definitions for game logic
-        function startTrivia() { /* Start trivia logic */ }
-        function closeReveal() { /* Close reveal logic */ }
-        function showView(viewId) { /* Show view logic */ }
-        function loadGame() { /* Load game logic */ }
-        function generateDailyQuests() { /* Generate quests logic */ }
-        function initializeUI() { /* Initialize UI logic */ }
+        function updateMilk() {
+            milkPercentage = Math.min(achievementCount * milkPerAchievement, 100);
+            document.getElementById('milkPercentage').innerText = milkPercentage;
 
-        window.addEventListener('click', (e) => { if (e.target.classList.contains('modal')) e.target.style.display = 'none'; });
-        loadGame(); 
-        generateDailyQuests(); 
-        initializeUI(); 
+            if (achievementCount >= 25) milkType = 'Cocoa';
+            if (achievementCount >= 50) milkType = 'Strawberry';
+            document.getElementById('milkBar').style.backgroundColor = milkType === 'Plain' ? 'lightblue' : milkType === 'Cocoa' ? 'brown' : 'pink';
+            document.getElementById('milkBar').style.height = milkPercentage + '%';
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Clicker Clone</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #cookie { font-size: 50px; cursor: pointer; }
+        .building { margin: 10px; }
+        #milkBar { height: 20px; background-color: lightblue; width: 100%; position: fixed; bottom: 0; left: 0; }
+    </style>
+</head>
+<body>
+    <h1>Cookie Clicker Clone</h1>
+    <div id="milkBar"></div>
+    <div id="cookie" onclick="clickCookie()">🍪</div>
+    <p>Cookies: <span id="cookieCount">0</span></p>
+    <p>Achievements: <span id="achievementCount">0</span></p>
+    
+    <div class="building">
+        <button onclick="buyBuilding('cursor')">Buy Cursor (Cost: <span id="cursorCost">15</span>)</button>
+        <p>Cursors: <span id="cursorCount">0</span> (CpS: <span id="cursorCpS">0</span>)</p>
+    </div>
+    
+    <div class="building">
+        <button onclick="buyBuilding('grandma')">Buy Grandma (Cost: <span id="grandmaCost">100</span>)</button>
+        <p>Grandmas: <span id="grandmaCount">0</span> (CpS: <span id="grandmaCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('farm')">Buy Farm (Cost: <span id="farmCost">1100</span>)</button>
+        <p>Farms: <span id="farmCount">0</span> (CpS: <span id="farmCpS">0</span>)</p>
+    </div>
+    
+    <div class="building">
+        <button onclick="buyBuilding('factory')">Buy Factory (Cost: <span id="factoryCost">12000</span>)</button>
+        <p>Factories: <span id="factoryCount">0</span> (CpS: <span id="factoryCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('bank')">Buy Bank (Cost: <span id="bankCost">130000</span>)</button>
+        <p>Banks: <span id="bankCount">0</span> (CpS: <span id="bankCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('temple')">Buy Temple (Cost: <span id="templeCost">1400000</span>)</button>
+        <p>Temples: <span id="templeCount">0</span> (CpS: <span id="templeCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('wizard')">Buy Wizard Tower (Cost: <span id="wizardCost">15000000</span>)</button>
+        <p>Wizard Towers: <span id="wizardCount">0</span> (CpS: <span id="wizardCpS">0</span>)</p>
+    </div>
+
+    <div class="building">
+        <button onclick="buyBuilding('kitten')">Buy Kitten Upgrade (Cost: <span id="kittenCost">100</span>)</button>
+        <p>Kittens: <span id="kittenCount">0</span> (Milk %: <span id="milkPercentage">0</span>)</p>
+    </div>
+
+    <script>
+        let cookieCount = 0, cursorCount = 0, grandmaCount = 0, farmCount = 0, factoryCount = 0, bankCount = 0, templeCount = 0, wizardCount = 0, kittenCount = 0;
+        let cursorCost = 15, grandmaCost = 100, farmCost = 1100, factoryCost = 12000, bankCost = 130000, templeCost = 1400000, wizardCost = 15000000, kittenCost = 100;
+        const cursorBaseCpS = 0.1, grandmaBaseCpS = 1, farmBaseCpS = 8, factoryBaseCpS = 47, bankBaseCpS = 260, templeBaseCpS = 1400, wizardBaseCpS = 7000, milkPerAchievement = 4;
+        let achievementCount = 0, milkPercentage = 0, milkType = 'Plain';
+
+        function clickCookie() {
+            cookieCount++;
+            document.getElementById('cookieCount').innerText = cookieCount;
+            checkAchievements();
+            updateMilk();
+            updateCpS();
+        }
+
+        function buyBuilding(type) {
+            if (type === 'cursor' && cookieCount >= cursorCost) {
+                cursorCount++;
+                cookieCount -= cursorCost;
+                cursorCost = Math.floor(cursorCost * 1.15);
+                updateBuilding('cursor', cursorCount, cursorCost, cursorBaseCpS);
+            } else if (type === 'grandma' && cookieCount >= grandmaCost) {
+                grandmaCount++;
+                cookieCount -= grandmaCost;
+                grandmaCost = Math.floor(grandmaCost * 1.15);
+                updateBuilding('grandma', grandmaCount, grandmaCost, grandmaBaseCpS);
+            } else if (type === 'farm' && cookieCount >= farmCost) {
+                farmCount++;
+                cookieCount -= farmCost;
+                farmCost = Math.floor(farmCost * 1.15);
+                updateBuilding('farm', farmCount, farmCost, farmBaseCpS);
+            } else if (type === 'factory' && cookieCount >= factoryCost) {
+                factoryCount++;
+                cookieCount -= factoryCost;
+                factoryCost = Math.floor(factoryCost * 1.15);
+                updateBuilding('factory', factoryCount, factoryCost, factoryBaseCpS);
+            } else if (type === 'bank' && cookieCount >= bankCost) {
+                bankCount++;
+                cookieCount -= bankCost;
+                bankCost = Math.floor(bankCost * 1.15);
+                updateBuilding('bank', bankCount, bankCost, bankBaseCpS);
+            } else if (type === 'temple' && cookieCount >= templeCost) {
+                templeCount++;
+                cookieCount -= templeCost;
+                templeCost = Math.floor(templeCost * 1.15);
+                updateBuilding('temple', templeCount, templeCost, templeBaseCpS);
+            } else if (type === 'wizard' && cookieCount >= wizardCost) {
+                wizardCount++;
+                cookieCount -= wizardCost;
+                wizardCost = Math.floor(wizardCost * 1.15);
+                updateBuilding('wizard', wizardCount, wizardCost, wizardBaseCpS);
+            } else if (type === 'kitten' && cookieCount >= kittenCost) {
+                kittenCount++;
+                cookieCount -= kittenCost;
+                kittenCost = Math.floor(kittenCost * 1.15);
+                updateBuilding('kitten', kittenCount, kittenCost, 0);
+            } else {
+                alert("Not enough cookies or invalid building.");
+                return;
+            }
+            document.getElementById('cookieCount').innerText = cookieCount;
+            updateCpS();
+        }
+
+        function updateBuilding(type, count, cost, baseCpS) {
+            document.getElementById(type + 'Count').innerText = count;
+            document.getElementById(type + 'Cost').innerText = cost;
+        }
+
+        function updateCpS() {
+            const totalCpS = (cursorCount * cursorBaseCpS) + (grandmaCount * grandmaBaseCpS) + (farmCount * farmBaseCpS) +
+                             (factoryCount * factoryBaseCpS) + (bankCount * bankBaseCpS) + (templeCount * templeBaseCpS) +
+                             (wizardCount * wizardBaseCpS) + (kittenCount * (milkPercentage / 100));
+            setInterval(() => {
+                cookieCount += totalCpS;
+                document.getElementById('cookieCount').innerText = cookieCount;
+            }, 1000);
+        }
+
+        function checkAchievements() {
+            while (cookieCount >= 100 * (achievementCount + 1)) {
+                achievementCount++;
+                document.getElementById('achievementCount').innerText = achievementCount;
+                updateMilk();
+            }
+        }
+
+        function updateMilk() {
+            milkPercentage = Math.min(achievementCount * milkPerAchievement, 100);
+            document.getElementById('milkPercentage').innerText = milkPercentage;
+
+            if (achievementCount >= 25) milkType = 'Cocoa';
+            if (achievementCount >= 50) milkType = 'Strawberry';
+            document.getElementById('milkBar').style.backgroundColor = milkType === 'Plain' ? 'lightblue' : milkType === 'Cocoa' ? 'brown' : 'pink';
+            document.getElementById('milkBar').style.height = milkPercentage + '%';
+        }
     </script>
 </body>
 </html>
