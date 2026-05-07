@@ -3,313 +3,458 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookie Clicker Clone</title>
+    <title>Fortnite JS - Advanced Battle Royale</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #cookie { font-size: 50px; cursor: pointer; }
-        .building { margin: 10px; }
-        #milkBar { height: 20px; background-color: lightblue; width: 100%; position: fixed; bottom: 0; left: 0; }
+        body { margin: 0; overflow: hidden; font-family: 'Arial Black', sans-serif; background: #000; }
+        #ui-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; color: white;
+        }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%; width: 15px; height: 15px;
+            border: 2px solid rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%);
+        }
+        #hud-bottom {
+            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
+        }
+        #health-container {
+            width: 400px; height: 30px; background: rgba(0,0,0,0.6); 
+            border: 3px solid #333; border-radius: 5px; overflow: hidden;
+        }
+        #health-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60); transition: width 0.2s; }
+        #shield-fill { width: 50%; height: 100%; background: linear-gradient(90deg, #3498db, #2980b9); margin-top: -30px; transition: width 0.2s; }
+        
+        #inventory { display: flex; gap: 12px; pointer-events: auto; }
+        .slot {
+            width: 70px; height: 70px; background: rgba(20, 20, 25, 0.85);
+            border: 3px solid #444; border-radius: 8px; display: flex; 
+            flex-direction: column; align-items: center; justify-content: center;
+            font-size: 10px; color: #aaa; transition: 0.1s;
+        }
+        .slot.active { border-color: #f1c40f; background: rgba(241, 196, 15, 0.2); color: #fff; transform: scale(1.1); }
+        .slot-key { font-weight: bold; margin-bottom: 4px; color: #777; }
+
+        #kill-feed {
+            position: absolute; top: 20px; left: 20px; width: 250px;
+            height: 200px; font-size: 14px; color: #fff;
+            display: flex; flex-direction: column-reverse; gap: 5px;
+        }
+        #stats { position: absolute; top: 20px; right: 20px; text-align: right; }
+        .stat-val { font-size: 28px; color: #f1c40f; }
+        #build-menu {
+            position: absolute; bottom: 130px; right: 40px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .build-icon { width: 50px; height: 50px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 4px; }
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #111; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 1000;
+        }
     </style>
 </head>
 <body>
-    <h1>Cookie Clicker Clone</h1>
-    <div id="milkBar"></div>
-    <div id="cookie" onclick="clickCookie()">🍪</div>
-    <p>Cookies: <span id="cookieCount">0</span></p>
-    <p>Achievements: <span id="achievementCount">0</span></p>
+
+<div id="loading-screen">
+    <h1 style="color: #f1c40f; font-size: 48px;">FORTNITE JS</h1>
+    <p style="color: white;">Click anywhere to drop into the island</p>
+</div>
+
+<div id="ui-overlay">
+    <div id="crosshair"></div>
+    <div id="kill-feed"></div>
     
-    <div class="building">
-        <button onclick="buyBuilding('cursor')">Buy Cursor (Cost: <span id="cursorCost">15</span>)</button>
-        <p>Cursors: <span id="cursorCount">0</span> (CpS: <span id="cursorCpS">0</span>)</p>
-    </div>
-    
-    <div class="building">
-        <button onclick="buyBuilding('grandma')">Buy Grandma (Cost: <span id="grandmaCost">100</span>)</button>
-        <p>Grandmas: <span id="grandmaCount">0</span> (CpS: <span id="grandmaCpS">0</span>)</p>
+    <div id="stats">
+        <div>MATS: <span id="mat-count" class="stat-val">500</span></div>
+        <div>KILLS: <span id="kill-count" class="stat-val">0</span></div>
+        <div id="timer">STORM: 02:45</div>
     </div>
 
-    <div class="building">
-        <button onclick="buyBuilding('farm')">Buy Farm (Cost: <span id="farmCost">1100</span>)</button>
-        <p>Farms: <span id="farmCount">0</span> (CpS: <span id="farmCpS">0</span>)</p>
+    <div id="hud-bottom">
+        <div id="health-container">
+            <div id="health-fill"></div>
+            <div id="shield-fill" style="width: 0%;"></div>
+        </div>
+        
+        <div id="inventory">
+            <div class="slot active" id="slot-1"><span class="slot-key">1</span><span>PICKAXE</span></div>
+            <div class="slot" id="slot-2"><span class="slot-key">2</span><span>AR</span></div>
+            <div class="slot" id="slot-3"><span class="slot-key">3</span><span>SHOTGUN</span></div>
+            <div class="slot" id="slot-4"><span class="slot-key">4</span><span>SNIPER</span></div>
+            <div class="slot" id="slot-5"><span class="slot-key">5</span><span>MINIS</span></div>
+        </div>
     </div>
-    
-    <div class="building">
-        <button onclick="buyBuilding('factory')">Buy Factory (Cost: <span id="factoryCost">12000</span>)</button>
-        <p>Factories: <span id="factoryCount">0</span> (CpS: <span id="factoryCpS">0</span>)</p>
-    </div>
+</div>
 
-    <div class="building">
-        <button onclick="buyBuilding('bank')">Buy Bank (Cost: <span id="bankCost">130000</span>)</button>
-        <p>Banks: <span id="bankCount">0</span> (CpS: <span id="bankCpS">0</span>)</p>
-    </div>
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com",
+            "three/addons/": "https://unpkg.com"
+        }
+    }
+</script>
 
-    <div class="building">
-        <button onclick="buyBuilding('temple')">Buy Temple (Cost: <span id="templeCost">1400000</span>)</button>
-        <p>Temples: <span id="templeCount">0</span> (CpS: <span id="templeCpS">0</span>)</p>
-    </div>
+<script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 
-    <div class="building">
-        <button onclick="buyBuilding('wizard')">Buy Wizard Tower (Cost: <span id="wizardCost">15000000</span>)</button>
-        <p>Wizard Towers: <span id="wizardCount">0</span> (CpS: <span id="wizardCpS">0</span>)</p>
-    </div>
+    /**
+     * ==========================================
+     * CONSTANTS & GAME SETTINGS
+     * ==========================================
+     */
+    const SETTINGS = {
+        TICK_RATE: 60,
+        GRAVITY: 30,
+        WALK_SPEED: 12,
+        RUN_SPEED: 22,
+        JUMP_FORCE: 12,
+        BUILD_GRID: 5,
+        MAX_HEALTH: 100,
+        MAX_SHIELD: 100,
+        WORLD_SIZE: 1000,
+        WEAPONS: {
+            PICKAXE: { damage: 20, range: 4, rate: 500 },
+            AR: { damage: 33, range: 200, rate: 150, spread: 0.02 },
+            SHOTGUN: { damage: 8, pellets: 8, range: 20, rate: 800, spread: 0.1 },
+            SNIPER: { damage: 110, range: 1000, rate: 1500, spread: 0 }
+        }
+    };
 
-    <div class="building">
-        <button onclick="buyBuilding('kitten')">Buy Kitten Upgrade (Cost: <span id="kittenCost">100</span>)</button>
-        <p>Kittens: <span id="kittenCount">0</span> (Milk %: <span id="milkPercentage">0</span>)</p>
-    </div>
+    /**
+     * ==========================================
+     * UTILITIES & ASSET FACTORY
+     * ==========================================
+     */
+    const createMaterial = (color) => new THREE.MeshStandardMaterial({ color });
+    const COLORS = {
+        GRASS: 0x3d9943,
+        DIRT: 0x5d4037,
+        WOOD: 0x795548,
+        METAL: 0x78909c,
+        ENEMY: 0xe74c3c,
+        CHEST: 0xf1c40f
+    };
 
-    <script>
-        let cookieCount = 0, cursorCount = 0, grandmaCount = 0, farmCount = 0, factoryCount = 0, bankCount = 0, templeCount = 0, wizardCount = 0, kittenCount = 0;
-        let cursorCost = 15, grandmaCost = 100, farmCost = 1100, factoryCost = 12000, bankCost = 130000, templeCost = 1400000, wizardCost = 15000000, kittenCost = 100;
-        const cursorBaseCpS = 0.1, grandmaBaseCpS = 1, farmBaseCpS = 8, factoryBaseCpS = 47, bankBaseCpS = 260, templeBaseCpS = 1400, wizardBaseCpS = 7000, milkPerAchievement = 4;
-        let achievementCount = 0, milkPercentage = 0, milkType = 'Plain';
+    /**
+     * ==========================================
+     * MAIN GAME ENGINE
+     * ==========================================
+     */
+    class FortniteClone {
+        constructor() {
+            this.scene = new THREE.Scene();
+            this.clock = new THREE.Clock();
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            // State
+            this.player = {
+                health: 100,
+                shield: 0,
+                mats: 500,
+                kills: 0,
+                activeSlot: 1,
+                isGrounded: false,
+                velocity: new THREE.Vector3(),
+                position: new THREE.Vector3(0, 5, 0)
+            };
 
-        function clickCookie() {
-            cookieCount++;
-            document.getElementById('cookieCount').innerText = cookieCount;
-            checkAchievements();
-            updateMilk();
-            updateCpS();
+            this.input = { forward: false, backward: false, left: false, right: false, shift: false };
+            this.objects = []; // For collisions
+            this.enemies = [];
+            this.bullets = [];
+            this.builds = [];
+            this.chests = [];
+            
+            this.lastFireTime = 0;
+            this.init();
         }
 
-        function buyBuilding(type) {
-            if (type === 'cursor' && cookieCount >= cursorCost) {
-                cursorCount++;
-                cookieCount -= cursorCost;
-                cursorCost = Math.floor(cursorCost * 1.15);
-                updateBuilding('cursor', cursorCount, cursorCost, cursorBaseCpS);
-            } else if (type === 'grandma' && cookieCount >= grandmaCost) {
-                grandmaCount++;
-                cookieCount -= grandmaCost;
-                grandmaCost = Math.floor(grandmaCost * 1.15);
-                updateBuilding('grandma', grandmaCount, grandmaCost, grandmaBaseCpS);
-            } else if (type === 'farm' && cookieCount >= farmCost) {
-                farmCount++;
-                cookieCount -= farmCost;
-                farmCost = Math.floor(farmCost * 1.15);
-                updateBuilding('farm', farmCount, farmCost, farmBaseCpS);
-            } else if (type === 'factory' && cookieCount >= factoryCost) {
-                factoryCount++;
-                cookieCount -= factoryCost;
-                factoryCost = Math.floor(factoryCost * 1.15);
-                updateBuilding('factory', factoryCount, factoryCost, factoryBaseCpS);
-            } else if (type === 'bank' && cookieCount >= bankCost) {
-                bankCount++;
-                cookieCount -= bankCost;
-                bankCost = Math.floor(bankCost * 1.15);
-                updateBuilding('bank', bankCount, bankCost, bankBaseCpS);
-            } else if (type === 'temple' && cookieCount >= templeCost) {
-                templeCount++;
-                cookieCount -= templeCost;
-                templeCost = Math.floor(templeCost * 1.15);
-                updateBuilding('temple', templeCount, templeCost, templeBaseCpS);
-            } else if (type === 'wizard' && cookieCount >= wizardCost) {
-                wizardCount++;
-                cookieCount -= wizardCost;
-                wizardCost = Math.floor(wizardCost * 1.15);
-                updateBuilding('wizard', wizardCount, wizardCost, wizardBaseCpS);
-            } else if (type === 'kitten' && cookieCount >= kittenCost) {
-                kittenCount++;
-                cookieCount -= kittenCost;
-                kittenCost = Math.floor(kittenCost * 1.15);
-                updateBuilding('kitten', kittenCount, kittenCost, 0);
-            } else {
-                alert("Not enough cookies or invalid building.");
+        async init() {
+            // Renderer Setup
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(window.devicePixelRatio);
+            this.renderer.shadowMap.enabled = true;
+            document.body.appendChild(this.renderer.domElement);
+
+            // Controls
+            this.controls = new PointerLockControls(this.camera, document.body);
+            
+            this.setupLighting();
+            this.setupMap();
+            this.setupEventListeners();
+            this.spawnEnemies(15);
+            this.spawnChests(20);
+
+            // Start Game
+            document.getElementById('loading-screen').addEventListener('click', () => {
+                this.controls.lock();
+                document.getElementById('loading-screen').style.display = 'none';
+            });
+
+            this.animate();
+        }
+
+        setupLighting() {
+            this.scene.background = new THREE.Color(0x87ceeb);
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            this.scene.add(ambient);
+
+            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+            sun.position.set(100, 200, 100);
+            sun.castShadow = true;
+            sun.shadow.camera.left = -500;
+            sun.shadow.camera.right = 500;
+            sun.shadow.camera.top = 500;
+            sun.shadow.camera.bottom = -500;
+            this.scene.add(sun);
+        }
+
+        setupMap() {
+            // Infinite-ish Ground
+            const groundGeo = new THREE.PlaneGeometry(SETTINGS.WORLD_SIZE, SETTINGS.WORLD_SIZE);
+            const groundMat = createMaterial(COLORS.GRASS);
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            this.scene.add(ground);
+            this.objects.push(ground);
+
+            // Water surrounding the island
+            const waterGeo = new THREE.PlaneGeometry(5000, 5000);
+            const waterMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, transparent: true, opacity: 0.8 });
+            const water = new THREE.Mesh(waterGeo, waterMat);
+            water.rotation.x = -Math.PI / 2;
+            water.position.y = -2;
+            this.scene.add(water);
+
+            // Random Houses/Obstacles
+            for(let i=0; i<30; i++) {
+                this.createStructure(
+                    (Math.random() - 0.5) * 400,
+                    (Math.random() - 0.5) * 400
+                );
+            }
+        }
+
+        createStructure(x, z) {
+            const group = new THREE.Group();
+            const h = 5 + Math.random() * 10;
+            const geo = new THREE.BoxGeometry(8, h, 8);
+            const mat = createMaterial(COLORS.DIRT);
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, h/2, z);
+            mesh.castShadow = mesh.receiveShadow = true;
+            this.scene.add(mesh);
+            this.objects.push(mesh);
+        }
+
+        spawnEnemies(count) {
+            for(let i=0; i<count; i++) {
+                const geo = new THREE.CapsuleGeometry(0.8, 2, 4, 8);
+                const mat = createMaterial(COLORS.ENEMY);
+                const enemy = new THREE.Mesh(geo, mat);
+                enemy.position.set((Math.random()-0.5)*600, 1.5, (Math.random()-0.5)*600);
+                enemy.userData = { health: 100, lastMove: 0 };
+                this.scene.add(enemy);
+                this.enemies.push(enemy);
+            }
+        }
+
+        spawnChests(count) {
+            for(let i=0; i<count; i++) {
+                const geo = new THREE.BoxGeometry(2, 1.5, 1.2);
+                const mat = createMaterial(COLORS.CHEST);
+                const chest = new THREE.Mesh(geo, mat);
+                chest.position.set((Math.random()-0.5)*400, 0.75, (Math.random()-0.5)*400);
+                this.scene.add(chest);
+                this.chests.push(chest);
+            }
+        }
+
+        setupEventListeners() {
+            window.addEventListener('keydown', (e) => {
+                switch(e.code) {
+                    case 'KeyW': this.input.forward = true; break;
+                    case 'KeyS': this.input.backward = true; break;
+                    case 'KeyA': this.input.left = true; break;
+                    case 'KeyD': this.input.right = true; break;
+                    case 'ShiftLeft': this.input.shift = true; break;
+                    case 'Space': if(this.player.isGrounded) this.player.velocity.y += SETTINGS.JUMP_FORCE; break;
+                    case 'Digit1': this.switchSlot(1); break;
+                    case 'Digit2': this.switchSlot(2); break;
+                    case 'Digit3': this.switchSlot(3); break;
+                    case 'Digit4': this.switchSlot(4); break;
+                    case 'Digit5': this.switchSlot(5); break;
+                    case 'KeyQ': this.buildStructure('wall'); break;
+                    case 'KeyF': this.buildStructure('floor'); break;
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                switch(e.code) {
+                    case 'KeyW': this.input.forward = false; break;
+                    case 'KeyS': this.input.backward = false; break;
+                    case 'KeyA': this.input.left = false; break;
+                    case 'KeyD': this.input.right = false; break;
+                    case 'ShiftLeft': this.input.shift = false; break;
+                }
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if(this.controls.isLocked) this.fireWeapon();
+            });
+        }
+
+        switchSlot(n) {
+            this.player.activeSlot = n;
+            const slots = document.querySelectorAll('.slot');
+            slots.forEach(s => s.classList.remove('active'));
+            document.getElementById(`slot-${n}`).classList.add('active');
+        }
+
+        fireWeapon() {
+            const now = Date.now();
+            const weaponType = ['','PICKAXE','AR','SHOTGUN','SNIPER','MINIS'][this.player.activeSlot];
+            const config = SETTINGS.WEAPONS[weaponType];
+
+            if(!config || now - this.lastFireTime < config.rate) return;
+            this.lastFireTime = now;
+
+            if(weaponType === 'MINIS') {
+                this.consumeHeal();
                 return;
             }
-            document.getElementById('cookieCount').innerText = cookieCount;
-            updateCpS();
-        }
 
-        function updateBuilding(type, count, cost, baseCpS) {
-            document.getElementById(type + 'Count').innerText = count;
-            document.getElementById(type + 'Cost').innerText = cost;
-        }
+            // Raycasting for hits
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
+            
+            const intersects = raycaster.intersectObjects([...this.enemies, ...this.objects, ...this.builds]);
 
-        function updateCpS() {
-            const totalCpS = (cursorCount * cursorBaseCpS) + (grandmaCount * grandmaBaseCpS) + (farmCount * farmBaseCpS) +
-                             (factoryCount * factoryBaseCpS) + (bankCount * bankBaseCpS) + (templeCount * templeBaseCpS) +
-                             (wizardCount * wizardBaseCpS) + (kittenCount * (milkPercentage / 100));
-            setInterval(() => {
-                cookieCount += totalCpS;
-                document.getElementById('cookieCount').innerText = cookieCount;
-            }, 1000);
-        }
+            if(intersects.length > 0) {
+                const target = intersects[0].object;
+                this.createHitEffect(intersects[0].point);
 
-        function checkAchievements() {
-            while (cookieCount >= 100 * (achievementCount + 1)) {
-                achievementCount++;
-                document.getElementById('achievementCount').innerText = achievementCount;
-                updateMilk();
+                // If hit enemy
+                if(this.enemies.includes(target)) {
+                    target.userData.health -= config.damage;
+                    if(target.userData.health <= 0) this.killEnemy(target);
+                }
             }
         }
 
-        function updateMilk() {
-            milkPercentage = Math.min(achievementCount * milkPerAchievement, 100);
-            document.getElementById('milkPercentage').innerText = milkPercentage;
+        buildStructure(type) {
+            if(this.player.mats < 10) return;
 
-            if (achievementCount >= 25) milkType = 'Cocoa';
-            if (achievementCount >= 50) milkType = 'Strawberry';
-            document.getElementById('milkBar').style.backgroundColor = milkType === 'Plain' ? 'lightblue' : milkType === 'Cocoa' ? 'brown' : 'pink';
-            document.getElementById('milkBar').style.height = milkPercentage + '%';
-        }
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cookie Clicker Clone</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        #cookie { font-size: 50px; cursor: pointer; }
-        .building { margin: 10px; }
-        #milkBar { height: 20px; background-color: lightblue; width: 100%; position: fixed; bottom: 0; left: 0; }
-    </style>
-</head>
-<body>
-    <h1>Cookie Clicker Clone</h1>
-    <div id="milkBar"></div>
-    <div id="cookie" onclick="clickCookie()">🍪</div>
-    <p>Cookies: <span id="cookieCount">0</span></p>
-    <p>Achievements: <span id="achievementCount">0</span></p>
-    
-    <div class="building">
-        <button onclick="buyBuilding('cursor')">Buy Cursor (Cost: <span id="cursorCost">15</span>)</button>
-        <p>Cursors: <span id="cursorCount">0</span> (CpS: <span id="cursorCpS">0</span>)</p>
-    </div>
-    
-    <div class="building">
-        <button onclick="buyBuilding('grandma')">Buy Grandma (Cost: <span id="grandmaCost">100</span>)</button>
-        <p>Grandmas: <span id="grandmaCount">0</span> (CpS: <span id="grandmaCpS">0</span>)</p>
-    </div>
+            const pos = new THREE.Vector3();
+            this.camera.getWorldPosition(pos);
+            const dir = new THREE.Vector3();
+            this.camera.getWorldDirection(dir);
 
-    <div class="building">
-        <button onclick="buyBuilding('farm')">Buy Farm (Cost: <span id="farmCost">1100</span>)</button>
-        <p>Farms: <span id="farmCount">0</span> (CpS: <span id="farmCpS">0</span>)</p>
-    </div>
-    
-    <div class="building">
-        <button onclick="buyBuilding('factory')">Buy Factory (Cost: <span id="factoryCost">12000</span>)</button>
-        <p>Factories: <span id="factoryCount">0</span> (CpS: <span id="factoryCpS">0</span>)</p>
-    </div>
+            const buildPos = pos.add(dir.multiplyScalar(6));
+            // Snap to grid
+            buildPos.x = Math.round(buildPos.x / SETTINGS.BUILD_GRID) * SETTINGS.BUILD_GRID;
+            buildPos.z = Math.round(buildPos.z / SETTINGS.BUILD_GRID) * SETTINGS.BUILD_GRID;
+            buildPos.y = Math.max(0.5, Math.round(buildPos.y / 4) * 4);
 
-    <div class="building">
-        <button onclick="buyBuilding('bank')">Buy Bank (Cost: <span id="bankCost">130000</span>)</button>
-        <p>Banks: <span id="bankCount">0</span> (CpS: <span id="bankCpS">0</span>)</p>
-    </div>
+            let geo;
+            if(type === 'wall') geo = new THREE.BoxGeometry(SETTINGS.BUILD_GRID, 4, 0.4);
+            else geo = new THREE.BoxGeometry(SETTINGS.BUILD_GRID, 0.4, SETTINGS.BUILD_GRID);
 
-    <div class="building">
-        <button onclick="buyBuilding('temple')">Buy Temple (Cost: <span id="templeCost">1400000</span>)</button>
-        <p>Temples: <span id="templeCount">0</span> (CpS: <span id="templeCpS">0</span>)</p>
-    </div>
-
-    <div class="building">
-        <button onclick="buyBuilding('wizard')">Buy Wizard Tower (Cost: <span id="wizardCost">15000000</span>)</button>
-        <p>Wizard Towers: <span id="wizardCount">0</span> (CpS: <span id="wizardCpS">0</span>)</p>
-    </div>
-
-    <div class="building">
-        <button onclick="buyBuilding('kitten')">Buy Kitten Upgrade (Cost: <span id="kittenCost">100</span>)</button>
-        <p>Kittens: <span id="kittenCount">0</span> (Milk %: <span id="milkPercentage">0</span>)</p>
-    </div>
-
-    <script>
-        let cookieCount = 0, cursorCount = 0, grandmaCount = 0, farmCount = 0, factoryCount = 0, bankCount = 0, templeCount = 0, wizardCount = 0, kittenCount = 0;
-        let cursorCost = 15, grandmaCost = 100, farmCost = 1100, factoryCost = 12000, bankCost = 130000, templeCost = 1400000, wizardCost = 15000000, kittenCost = 100;
-        const cursorBaseCpS = 0.1, grandmaBaseCpS = 1, farmBaseCpS = 8, factoryBaseCpS = 47, bankBaseCpS = 260, templeBaseCpS = 1400, wizardBaseCpS = 7000, milkPerAchievement = 4;
-        let achievementCount = 0, milkPercentage = 0, milkType = 'Plain';
-
-        function clickCookie() {
-            cookieCount++;
-            document.getElementById('cookieCount').innerText = cookieCount;
-            checkAchievements();
-            updateMilk();
-            updateCpS();
+            const mesh = new THREE.Mesh(geo, createMaterial(COLORS.WOOD));
+            mesh.position.copy(buildPos);
+            this.scene.add(mesh);
+            this.builds.push(mesh);
+            this.player.mats -= 10;
+            this.updateUI();
         }
 
-        function buyBuilding(type) {
-            if (type === 'cursor' && cookieCount >= cursorCost) {
-                cursorCount++;
-                cookieCount -= cursorCost;
-                cursorCost = Math.floor(cursorCost * 1.15);
-                updateBuilding('cursor', cursorCount, cursorCost, cursorBaseCpS);
-            } else if (type === 'grandma' && cookieCount >= grandmaCost) {
-                grandmaCount++;
-                cookieCount -= grandmaCost;
-                grandmaCost = Math.floor(grandmaCost * 1.15);
-                updateBuilding('grandma', grandmaCount, grandmaCost, grandmaBaseCpS);
-            } else if (type === 'farm' && cookieCount >= farmCost) {
-                farmCount++;
-                cookieCount -= farmCost;
-                farmCost = Math.floor(farmCost * 1.15);
-                updateBuilding('farm', farmCount, farmCost, farmBaseCpS);
-            } else if (type === 'factory' && cookieCount >= factoryCost) {
-                factoryCount++;
-                cookieCount -= factoryCost;
-                factoryCost = Math.floor(factoryCost * 1.15);
-                updateBuilding('factory', factoryCount, factoryCost, factoryBaseCpS);
-            } else if (type === 'bank' && cookieCount >= bankCost) {
-                bankCount++;
-                cookieCount -= bankCost;
-                bankCost = Math.floor(bankCost * 1.15);
-                updateBuilding('bank', bankCount, bankCost, bankBaseCpS);
-            } else if (type === 'temple' && cookieCount >= templeCost) {
-                templeCount++;
-                cookieCount -= templeCost;
-                templeCost = Math.floor(templeCost * 1.15);
-                updateBuilding('temple', templeCount, templeCost, templeBaseCpS);
-            } else if (type === 'wizard' && cookieCount >= wizardCost) {
-                wizardCount++;
-                cookieCount -= wizardCost;
-                wizardCost = Math.floor(wizardCost * 1.15);
-                updateBuilding('wizard', wizardCount, wizardCost, wizardBaseCpS);
-            } else if (type === 'kitten' && cookieCount >= kittenCost) {
-                kittenCount++;
-                cookieCount -= kittenCost;
-                kittenCost = Math.floor(kittenCost * 1.15);
-                updateBuilding('kitten', kittenCount, kittenCost, 0);
-            } else {
-                alert("Not enough cookies or invalid building.");
-                return;
+        createHitEffect(pos) {
+            const geo = new THREE.SphereGeometry(0.1);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+            const spark = new THREE.Mesh(geo, mat);
+            spark.position.copy(pos);
+            this.scene.add(spark);
+            setTimeout(() => this.scene.remove(spark), 100);
+        }
+
+        killEnemy(enemy) {
+            this.scene.remove(enemy);
+            this.enemies = this.enemies.filter(e => e !== enemy);
+            this.player.kills++;
+            this.addToKillFeed("Player eliminated an Enemy!");
+            this.updateUI();
+        }
+
+        addToKillFeed(msg) {
+            const feed = document.getElementById('kill-feed');
+            const entry = document.createElement('div');
+            entry.innerText = msg;
+            feed.appendChild(entry);
+            setTimeout(() => entry.remove(), 4000);
+        }
+
+        updateUI() {
+            document.getElementById('health-fill').style.width = `${this.player.health}%`;
+            document.getElementById('shield-fill').style.width = `${this.player.shield}%`;
+            document.getElementById('mat-count').innerText = this.player.mats;
+            document.getElementById('kill-count').innerText = this.player.kills;
+        }
+
+        animate() {
+            requestAnimationFrame(() => this.animate());
+            const delta = this.clock.getDelta();
+
+            if (this.controls.isLocked) {
+                // Physics & Movement
+                this.player.velocity.y -= SETTINGS.GRAVITY * delta;
+                
+                const moveDir = new THREE.Vector3();
+                const speed = this.input.shift ? SETTINGS.RUN_SPEED : SETTINGS.WALK_SPEED;
+
+                if (this.input.forward) moveDir.z += 1;
+                if (this.input.backward) moveDir.z -= 1;
+                if (this.input.left) moveDir.x -= 1;
+                if (this.input.right) moveDir.x += 1;
+
+                this.controls.moveRight(moveDir.x * speed * delta);
+                this.controls.moveForward(moveDir.z * speed * delta);
+
+                this.camera.position.y += this.player.velocity.y * delta;
+
+                // Ground Collision
+                if (this.camera.position.y < 2) {
+                    this.player.velocity.y = 0;
+                    this.camera.position.y = 2;
+                    this.player.isGrounded = true;
+                } else {
+                    this.player.isGrounded = false;
+                }
+
+                // AI Logic (Simple tracking)
+                this.enemies.forEach(enemy => {
+                    const dist = enemy.position.distanceTo(this.camera.position);
+                    if(dist < 50) {
+                        enemy.lookAt(this.camera.position.x, 1.5, this.camera.position.z);
+                        enemy.translateZ(0.05);
+                        if(dist < 3 && Math.random() < 0.02) {
+                            this.player.health -= 1;
+                            this.updateUI();
+                        }
+                    }
+                });
             }
-            document.getElementById('cookieCount').innerText = cookieCount;
-            updateCpS();
-        }
 
-        function updateBuilding(type, count, cost, baseCpS) {
-            document.getElementById(type + 'Count').innerText = count;
-            document.getElementById(type + 'Cost').innerText = cost;
+            this.renderer.render(this.scene, this.camera);
         }
+    }
 
-        function updateCpS() {
-            const totalCpS = (cursorCount * cursorBaseCpS) + (grandmaCount * grandmaBaseCpS) + (farmCount * farmBaseCpS) +
-                             (factoryCount * factoryBaseCpS) + (bankCount * bankBaseCpS) + (templeCount * templeBaseCpS) +
-                             (wizardCount * wizardBaseCpS) + (kittenCount * (milkPercentage / 100));
-            setInterval(() => {
-                cookieCount += totalCpS;
-                document.getElementById('cookieCount').innerText = cookieCount;
-            }, 1000);
-        }
-
-        function checkAchievements() {
-            while (cookieCount >= 100 * (achievementCount + 1)) {
-                achievementCount++;
-                document.getElementById('achievementCount').innerText = achievementCount;
-                updateMilk();
-            }
-        }
-
-        function updateMilk() {
-            milkPercentage = Math.min(achievementCount * milkPerAchievement, 100);
-            document.getElementById('milkPercentage').innerText = milkPercentage;
-
-            if (achievementCount >= 25) milkType = 'Cocoa';
-            if (achievementCount >= 50) milkType = 'Strawberry';
-            document.getElementById('milkBar').style.backgroundColor = milkType === 'Plain' ? 'lightblue' : milkType === 'Cocoa' ? 'brown' : 'pink';
-            document.getElementById('milkBar').style.height = milkPercentage + '%';
-        }
-    </script>
+    // Start the game instance
+    new FortniteClone();
+</script>
 </body>
 </html>
