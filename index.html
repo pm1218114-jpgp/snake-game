@@ -1,460 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fortnite JS - Advanced Battle Royale</title>
-    <style>
-        body { margin: 0; overflow: hidden; font-family: 'Arial Black', sans-serif; background: #000; }
-        #ui-overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; color: white;
-        }
-        #crosshair {
-            position: absolute; top: 50%; left: 50%; width: 15px; height: 15px;
-            border: 2px solid rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%);
-        }
-        #hud-bottom {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            display: flex; flex-direction: column; align-items: center; gap: 15px;
-        }
-        #health-container {
-            width: 400px; height: 30px; background: rgba(0,0,0,0.6); 
-            border: 3px solid #333; border-radius: 5px; overflow: hidden;
-        }
-        #health-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60); transition: width 0.2s; }
-        #shield-fill { width: 50%; height: 100%; background: linear-gradient(90deg, #3498db, #2980b9); margin-top: -30px; transition: width 0.2s; }
-        
-        #inventory { display: flex; gap: 12px; pointer-events: auto; }
-        .slot {
-            width: 70px; height: 70px; background: rgba(20, 20, 25, 0.85);
-            border: 3px solid #444; border-radius: 8px; display: flex; 
-            flex-direction: column; align-items: center; justify-content: center;
-            font-size: 10px; color: #aaa; transition: 0.1s;
-        }
-        .slot.active { border-color: #f1c40f; background: rgba(241, 196, 15, 0.2); color: #fff; transform: scale(1.1); }
-        .slot-key { font-weight: bold; margin-bottom: 4px; color: #777; }
-
-        #kill-feed {
-            position: absolute; top: 20px; left: 20px; width: 250px;
-            height: 200px; font-size: 14px; color: #fff;
-            display: flex; flex-direction: column-reverse; gap: 5px;
-        }
-        #stats { position: absolute; top: 20px; right: 20px; text-align: right; }
-        .stat-val { font-size: 28px; color: #f1c40f; }
-        #build-menu {
-            position: absolute; bottom: 130px; right: 40px;
-            display: flex; flex-direction: column; gap: 10px;
-        }
-        .build-icon { width: 50px; height: 50px; background: rgba(0,0,0,0.5); border: 2px solid #fff; border-radius: 4px; }
-        #loading-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #111; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 1000;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mini Minecraft Clone</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: sans-serif; }
+    canvas { display: block; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 12px;
+      border-radius: 8px;
+      z-index: 10;
+    }
+  </style>
 </head>
 <body>
+  <div id="info">Left click: Mine | Right click: Place block | WASD: Move | Mouse: Look</div>
 
-<div id="loading-screen">
-    <h1 style="color: #f1c40f; font-size: 48px;">FORTNITE JS</h1>
-    <p style="color: white;">Click anywhere to drop into the island</p>
-</div>
+  <script type="module">
+    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+    import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/PointerLockControls.js';
 
-<div id="ui-overlay">
-    <div id="crosshair"></div>
-    <div id="kill-feed"></div>
-    
-    <div id="stats">
-        <div>MATS: <span id="mat-count" class="stat-val">500</span></div>
-        <div>KILLS: <span id="kill-count" class="stat-val">0</span></div>
-        <div id="timer">STORM: 02:45</div>
-    </div>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb);
 
-    <div id="hud-bottom">
-        <div id="health-container">
-            <div id="health-fill"></div>
-            <div id="shield-fill" style="width: 0%;"></div>
-        </div>
-        
-        <div id="inventory">
-            <div class="slot active" id="slot-1"><span class="slot-key">1</span><span>PICKAXE</span></div>
-            <div class="slot" id="slot-2"><span class="slot-key">2</span><span>AR</span></div>
-            <div class="slot" id="slot-3"><span class="slot-key">3</span><span>SHOTGUN</span></div>
-            <div class="slot" id="slot-4"><span class="slot-key">4</span><span>SNIPER</span></div>
-            <div class="slot" id="slot-5"><span class="slot-key">5</span><span>MINIS</span></div>
-        </div>
-    </div>
-</div>
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-<script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com",
-            "three/addons/": "https://unpkg.com"
-        }
-    }
-</script>
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 20, 10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-<script type="module">
-    import * as THREE from 'three';
-    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+    const controls = new PointerLockControls(camera, document.body);
+    document.body.addEventListener('click', () => controls.lock());
+    scene.add(controls.getObject());
 
-    /**
-     * ==========================================
-     * CONSTANTS & GAME SETTINGS
-     * ==========================================
-     */
-    const SETTINGS = {
-        TICK_RATE: 60,
-        GRAVITY: 30,
-        WALK_SPEED: 12,
-        RUN_SPEED: 22,
-        JUMP_FORCE: 12,
-        BUILD_GRID: 5,
-        MAX_HEALTH: 100,
-        MAX_SHIELD: 100,
-        WORLD_SIZE: 1000,
-        WEAPONS: {
-            PICKAXE: { damage: 20, range: 4, rate: 500 },
-            AR: { damage: 33, range: 200, rate: 150, spread: 0.02 },
-            SHOTGUN: { damage: 8, pellets: 8, range: 20, rate: 800, spread: 0.1 },
-            SNIPER: { damage: 110, range: 1000, rate: 1500, spread: 0 }
-        }
+    camera.position.set(0, 3, 5);
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2(0, 0);
+    const blocks = [];
+    const blockMap = new Map();
+    const blockSize = 1;
+
+    const materials = {
+      grass: new THREE.MeshLambertMaterial({ color: 0x55aa55 }),
+      dirt: new THREE.MeshLambertMaterial({ color: 0x8b5a2b }),
+      stone: new THREE.MeshLambertMaterial({ color: 0x888888 }),
+      wood: new THREE.MeshLambertMaterial({ color: 0x775533 }),
+      leaves: new THREE.MeshLambertMaterial({ color: 0x228833 })
     };
 
-    /**
-     * ==========================================
-     * UTILITIES & ASSET FACTORY
-     * ==========================================
-     */
-    const createMaterial = (color) => new THREE.MeshStandardMaterial({ color });
-    const COLORS = {
-        GRASS: 0x3d9943,
-        DIRT: 0x5d4037,
-        WOOD: 0x795548,
-        METAL: 0x78909c,
-        ENEMY: 0xe74c3c,
-        CHEST: 0xf1c40f
-    };
-
-    /**
-     * ==========================================
-     * MAIN GAME ENGINE
-     * ==========================================
-     */
-    class FortniteClone {
-        constructor() {
-            this.scene = new THREE.Scene();
-            this.clock = new THREE.Clock();
-            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
-            
-            // State
-            this.player = {
-                health: 100,
-                shield: 0,
-                mats: 500,
-                kills: 0,
-                activeSlot: 1,
-                isGrounded: false,
-                velocity: new THREE.Vector3(),
-                position: new THREE.Vector3(0, 5, 0)
-            };
-
-            this.input = { forward: false, backward: false, left: false, right: false, shift: false };
-            this.objects = []; // For collisions
-            this.enemies = [];
-            this.bullets = [];
-            this.builds = [];
-            this.chests = [];
-            
-            this.lastFireTime = 0;
-            this.init();
-        }
-
-        async init() {
-            // Renderer Setup
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-            this.renderer.setPixelRatio(window.devicePixelRatio);
-            this.renderer.shadowMap.enabled = true;
-            document.body.appendChild(this.renderer.domElement);
-
-            // Controls
-            this.controls = new PointerLockControls(this.camera, document.body);
-            
-            this.setupLighting();
-            this.setupMap();
-            this.setupEventListeners();
-            this.spawnEnemies(15);
-            this.spawnChests(20);
-
-            // Start Game
-            document.getElementById('loading-screen').addEventListener('click', () => {
-                this.controls.lock();
-                document.getElementById('loading-screen').style.display = 'none';
-            });
-
-            this.animate();
-        }
-
-        setupLighting() {
-            this.scene.background = new THREE.Color(0x87ceeb);
-            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-            this.scene.add(ambient);
-
-            const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-            sun.position.set(100, 200, 100);
-            sun.castShadow = true;
-            sun.shadow.camera.left = -500;
-            sun.shadow.camera.right = 500;
-            sun.shadow.camera.top = 500;
-            sun.shadow.camera.bottom = -500;
-            this.scene.add(sun);
-        }
-
-        setupMap() {
-            // Infinite-ish Ground
-            const groundGeo = new THREE.PlaneGeometry(SETTINGS.WORLD_SIZE, SETTINGS.WORLD_SIZE);
-            const groundMat = createMaterial(COLORS.GRASS);
-            const ground = new THREE.Mesh(groundGeo, groundMat);
-            ground.rotation.x = -Math.PI / 2;
-            ground.receiveShadow = true;
-            this.scene.add(ground);
-            this.objects.push(ground);
-
-            // Water surrounding the island
-            const waterGeo = new THREE.PlaneGeometry(5000, 5000);
-            const waterMat = new THREE.MeshStandardMaterial({ color: 0x2980b9, transparent: true, opacity: 0.8 });
-            const water = new THREE.Mesh(waterGeo, waterMat);
-            water.rotation.x = -Math.PI / 2;
-            water.position.y = -2;
-            this.scene.add(water);
-
-            // Random Houses/Obstacles
-            for(let i=0; i<30; i++) {
-                this.createStructure(
-                    (Math.random() - 0.5) * 400,
-                    (Math.random() - 0.5) * 400
-                );
-            }
-        }
-
-        createStructure(x, z) {
-            const group = new THREE.Group();
-            const h = 5 + Math.random() * 10;
-            const geo = new THREE.BoxGeometry(8, h, 8);
-            const mat = createMaterial(COLORS.DIRT);
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, h/2, z);
-            mesh.castShadow = mesh.receiveShadow = true;
-            this.scene.add(mesh);
-            this.objects.push(mesh);
-        }
-
-        spawnEnemies(count) {
-            for(let i=0; i<count; i++) {
-                const geo = new THREE.CapsuleGeometry(0.8, 2, 4, 8);
-                const mat = createMaterial(COLORS.ENEMY);
-                const enemy = new THREE.Mesh(geo, mat);
-                enemy.position.set((Math.random()-0.5)*600, 1.5, (Math.random()-0.5)*600);
-                enemy.userData = { health: 100, lastMove: 0 };
-                this.scene.add(enemy);
-                this.enemies.push(enemy);
-            }
-        }
-
-        spawnChests(count) {
-            for(let i=0; i<count; i++) {
-                const geo = new THREE.BoxGeometry(2, 1.5, 1.2);
-                const mat = createMaterial(COLORS.CHEST);
-                const chest = new THREE.Mesh(geo, mat);
-                chest.position.set((Math.random()-0.5)*400, 0.75, (Math.random()-0.5)*400);
-                this.scene.add(chest);
-                this.chests.push(chest);
-            }
-        }
-
-        setupEventListeners() {
-            window.addEventListener('keydown', (e) => {
-                switch(e.code) {
-                    case 'KeyW': this.input.forward = true; break;
-                    case 'KeyS': this.input.backward = true; break;
-                    case 'KeyA': this.input.left = true; break;
-                    case 'KeyD': this.input.right = true; break;
-                    case 'ShiftLeft': this.input.shift = true; break;
-                    case 'Space': if(this.player.isGrounded) this.player.velocity.y += SETTINGS.JUMP_FORCE; break;
-                    case 'Digit1': this.switchSlot(1); break;
-                    case 'Digit2': this.switchSlot(2); break;
-                    case 'Digit3': this.switchSlot(3); break;
-                    case 'Digit4': this.switchSlot(4); break;
-                    case 'Digit5': this.switchSlot(5); break;
-                    case 'KeyQ': this.buildStructure('wall'); break;
-                    case 'KeyF': this.buildStructure('floor'); break;
-                }
-            });
-
-            window.addEventListener('keyup', (e) => {
-                switch(e.code) {
-                    case 'KeyW': this.input.forward = false; break;
-                    case 'KeyS': this.input.backward = false; break;
-                    case 'KeyA': this.input.left = false; break;
-                    case 'KeyD': this.input.right = false; break;
-                    case 'ShiftLeft': this.input.shift = false; break;
-                }
-            });
-
-            window.addEventListener('mousedown', (e) => {
-                if(this.controls.isLocked) this.fireWeapon();
-            });
-        }
-
-        switchSlot(n) {
-            this.player.activeSlot = n;
-            const slots = document.querySelectorAll('.slot');
-            slots.forEach(s => s.classList.remove('active'));
-            document.getElementById(`slot-${n}`).classList.add('active');
-        }
-
-        fireWeapon() {
-            const now = Date.now();
-            const weaponType = ['','PICKAXE','AR','SHOTGUN','SNIPER','MINIS'][this.player.activeSlot];
-            const config = SETTINGS.WEAPONS[weaponType];
-
-            if(!config || now - this.lastFireTime < config.rate) return;
-            this.lastFireTime = now;
-
-            if(weaponType === 'MINIS') {
-                this.consumeHeal();
-                return;
-            }
-
-            // Raycasting for hits
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0,0), this.camera);
-            
-            const intersects = raycaster.intersectObjects([...this.enemies, ...this.objects, ...this.builds]);
-
-            if(intersects.length > 0) {
-                const target = intersects[0].object;
-                this.createHitEffect(intersects[0].point);
-
-                // If hit enemy
-                if(this.enemies.includes(target)) {
-                    target.userData.health -= config.damage;
-                    if(target.userData.health <= 0) this.killEnemy(target);
-                }
-            }
-        }
-
-        buildStructure(type) {
-            if(this.player.mats < 10) return;
-
-            const pos = new THREE.Vector3();
-            this.camera.getWorldPosition(pos);
-            const dir = new THREE.Vector3();
-            this.camera.getWorldDirection(dir);
-
-            const buildPos = pos.add(dir.multiplyScalar(6));
-            // Snap to grid
-            buildPos.x = Math.round(buildPos.x / SETTINGS.BUILD_GRID) * SETTINGS.BUILD_GRID;
-            buildPos.z = Math.round(buildPos.z / SETTINGS.BUILD_GRID) * SETTINGS.BUILD_GRID;
-            buildPos.y = Math.max(0.5, Math.round(buildPos.y / 4) * 4);
-
-            let geo;
-            if(type === 'wall') geo = new THREE.BoxGeometry(SETTINGS.BUILD_GRID, 4, 0.4);
-            else geo = new THREE.BoxGeometry(SETTINGS.BUILD_GRID, 0.4, SETTINGS.BUILD_GRID);
-
-            const mesh = new THREE.Mesh(geo, createMaterial(COLORS.WOOD));
-            mesh.position.copy(buildPos);
-            this.scene.add(mesh);
-            this.builds.push(mesh);
-            this.player.mats -= 10;
-            this.updateUI();
-        }
-
-        createHitEffect(pos) {
-            const geo = new THREE.SphereGeometry(0.1);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            const spark = new THREE.Mesh(geo, mat);
-            spark.position.copy(pos);
-            this.scene.add(spark);
-            setTimeout(() => this.scene.remove(spark), 100);
-        }
-
-        killEnemy(enemy) {
-            this.scene.remove(enemy);
-            this.enemies = this.enemies.filter(e => e !== enemy);
-            this.player.kills++;
-            this.addToKillFeed("Player eliminated an Enemy!");
-            this.updateUI();
-        }
-
-        addToKillFeed(msg) {
-            const feed = document.getElementById('kill-feed');
-            const entry = document.createElement('div');
-            entry.innerText = msg;
-            feed.appendChild(entry);
-            setTimeout(() => entry.remove(), 4000);
-        }
-
-        updateUI() {
-            document.getElementById('health-fill').style.width = `${this.player.health}%`;
-            document.getElementById('shield-fill').style.width = `${this.player.shield}%`;
-            document.getElementById('mat-count').innerText = this.player.mats;
-            document.getElementById('kill-count').innerText = this.player.kills;
-        }
-
-        animate() {
-            requestAnimationFrame(() => this.animate());
-            const delta = this.clock.getDelta();
-
-            if (this.controls.isLocked) {
-                // Physics & Movement
-                this.player.velocity.y -= SETTINGS.GRAVITY * delta;
-                
-                const moveDir = new THREE.Vector3();
-                const speed = this.input.shift ? SETTINGS.RUN_SPEED : SETTINGS.WALK_SPEED;
-
-                if (this.input.forward) moveDir.z += 1;
-                if (this.input.backward) moveDir.z -= 1;
-                if (this.input.left) moveDir.x -= 1;
-                if (this.input.right) moveDir.x += 1;
-
-                this.controls.moveRight(moveDir.x * speed * delta);
-                this.controls.moveForward(moveDir.z * speed * delta);
-
-                this.camera.position.y += this.player.velocity.y * delta;
-
-                // Ground Collision
-                if (this.camera.position.y < 2) {
-                    this.player.velocity.y = 0;
-                    this.camera.position.y = 2;
-                    this.player.isGrounded = true;
-                } else {
-                    this.player.isGrounded = false;
-                }
-
-                // AI Logic (Simple tracking)
-                this.enemies.forEach(enemy => {
-                    const dist = enemy.position.distanceTo(this.camera.position);
-                    if(dist < 50) {
-                        enemy.lookAt(this.camera.position.x, 1.5, this.camera.position.z);
-                        enemy.translateZ(0.05);
-                        if(dist < 3 && Math.random() < 0.02) {
-                            this.player.health -= 1;
-                            this.updateUI();
-                        }
-                    }
-                });
-            }
-
-            this.renderer.render(this.scene, this.camera);
-        }
+    function key(x, y, z) {
+      return `${x},${y},${z}`;
     }
 
-    // Start the game instance
-    new FortniteClone();
-</script>
+    function addBlock(x, y, z, type = 'grass') {
+      const k = key(x, y, z);
+      if (blockMap.has(k)) return;
+      const geo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+      const mesh = new THREE.Mesh(geo, materials[type]);
+      mesh.position.set(x, y, z);
+      mesh.userData = { type, x, y, z };
+      scene.add(mesh);
+      blocks.push(mesh);
+      blockMap.set(k, mesh);
+    }
+
+    function removeBlock(block) {
+      const { x, y, z } = block.userData;
+      scene.remove(block);
+      blockMap.delete(key(x, y, z));
+      const i = blocks.indexOf(block);
+      if (i !== -1) blocks.splice(i, 1);
+    }
+
+    function generateTree(x, y, z) {
+      for (let i = 1; i <= 3; i++) addBlock(x, y + i, z, 'wood');
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let dy = 3; dy <= 4; dy++) {
+            if (!(dx === 0 && dz === 0 && dy === 3)) {
+              addBlock(x + dx, y + dy, z + dz, 'leaves');
+            }
+          }
+        }
+      }
+    }
+
+    function generateWorld() {
+      const size = 20;
+      for (let x = -size; x < size; x++) {
+        for (let z = -size; z < size; z++) {
+          addBlock(x, 0, z, 'grass');
+          addBlock(x, -1, z, 'dirt');
+          addBlock(x, -2, z, 'stone');
+
+          if (Math.random() < 0.10) {
+            generateTree(x, 0, z);
+          }
+        }
+      }
+    }
+
+    generateWorld();
+
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
+
+    document.addEventListener('mousedown', (event) => {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(blocks);
+      if (intersects.length === 0) return;
+
+      const hit = intersects[0];
+      const block = hit.object;
+
+      if (event.button === 0) {
+        removeBlock(block);
+      } else if (event.button === 2) {
+        const pos = hit.point.clone().add(hit.face.normal.clone().multiplyScalar(0.5));
+        const x = Math.round(pos.x);
+        const y = Math.round(pos.y);
+        const z = Math.round(pos.z);
+        addBlock(x, y, z, 'stone');
+      }
+    });
+
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const speed = 0.1;
+      if (controls.isLocked) {
+        if (keys['KeyW']) controls.moveForward(speed);
+        if (keys['KeyS']) controls.moveForward(-speed);
+        if (keys['KeyA']) controls.moveRight(-speed);
+        if (keys['KeyD']) controls.moveRight(speed);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
