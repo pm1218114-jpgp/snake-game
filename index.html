@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <div id="info">Left click: Mine | Right click: Place block | WASD: Move | Mouse: Look</div>
+  <div id="info">Click to lock mouse | Left click: Mine | Right click: Place block | WASD: Move</div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
@@ -40,13 +40,14 @@
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
     const controls = new PointerLockControls(camera, document.body);
-    document.body.addEventListener('click', () => controls.lock());
+    document.body.addEventListener('click', () => {
+      if (!controls.isLocked) controls.lock();
+    });
     scene.add(controls.getObject());
 
     camera.position.set(0, 3, 5);
 
     const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2(0, 0);
     const blocks = [];
     const blockMap = new Map();
     const blockSize = 1;
@@ -66,8 +67,9 @@
     function addBlock(x, y, z, type = 'grass') {
       const k = key(x, y, z);
       if (blockMap.has(k)) return;
+
       const geo = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
-      const mesh = new THREE.Mesh(geo, materials[type]);
+      const mesh = new THREE.Mesh(geo, materials[type] || materials.grass);
       mesh.position.set(x, y, z);
       mesh.userData = { type, x, y, z };
       scene.add(mesh);
@@ -81,10 +83,12 @@
       blockMap.delete(key(x, y, z));
       const i = blocks.indexOf(block);
       if (i !== -1) blocks.splice(i, 1);
+      block.geometry.dispose();
     }
 
     function generateTree(x, y, z) {
       for (let i = 1; i <= 3; i++) addBlock(x, y + i, z, 'wood');
+
       for (let dx = -1; dx <= 1; dx++) {
         for (let dz = -1; dz <= 1; dz++) {
           for (let dy = 3; dy <= 4; dy++) {
@@ -114,29 +118,34 @@
     generateWorld();
 
     const keys = {};
-    document.addEventListener('keydown', e => keys[e.code] = true);
-    document.addEventListener('keyup', e => keys[e.code] = false);
+    document.addEventListener('keydown', (e) => { keys[e.code] = true; });
+    document.addEventListener('keyup', (e) => { keys[e.code] = false; });
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    function getTargetBlock() {
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const intersects = raycaster.intersectObjects(blocks, false);
+      return intersects.length > 0 ? intersects[0] : null;
+    }
 
     document.addEventListener('mousedown', (event) => {
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(blocks);
-      if (intersects.length === 0) return;
+      if (!controls.isLocked) return;
 
-      const hit = intersects[0];
+      const hit = getTargetBlock();
+      if (!hit) return;
+
       const block = hit.object;
 
       if (event.button === 0) {
         removeBlock(block);
       } else if (event.button === 2) {
-        const pos = hit.point.clone().add(hit.face.normal.clone().multiplyScalar(0.5));
-        const x = Math.round(pos.x);
-        const y = Math.round(pos.y);
-        const z = Math.round(pos.z);
+        const placePos = block.position.clone().add(hit.face.normal);
+        const x = Math.round(placePos.x);
+        const y = Math.round(placePos.y);
+        const z = Math.round(placePos.z);
         addBlock(x, y, z, 'stone');
       }
     });
-
-    document.addEventListener('contextmenu', e => e.preventDefault());
 
     function animate() {
       requestAnimationFrame(animate);
