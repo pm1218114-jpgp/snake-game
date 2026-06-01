@@ -3,77 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Extended Minecraft Clone</title>
+    <title>3D Minecraft-Like Game</title>
     <style>
-        canvas { border: 1px solid black; }
-        body { display: flex; flex-direction: column; align-items: center; }
-        #info { margin: 10px; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="info">Select Block: <button onclick="selectBlock('grass')">Grass</button>
-        <button onclick="selectBlock('dirt')">Dirt</button>
-        <button onclick="selectBlock('stone')">Stone</button></div>
-    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <script src="https://threejs.org/build/three.js"></script>
     <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const gridSize = 20;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
         const blocks = {};
-        let selectedBlock = 'grass'; // Default block type
 
-        // Function to draw blocks
-        function drawBlocks() {
-            for (const key in blocks) {
-                const [x, y] = key.split(',').map(Number);
-                ctx.fillStyle = blocks[key]; // Block color based on type
-                ctx.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
+        // Function to add a block
+        function addBlock(x, y, z) {
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(x, y, z);
+            scene.add(cube);
+            blocks[`${x},${y},${z}`] = cube;
+        }
+
+        // Generate blocks with a 1/100 chance of being a tree
+        for (let x = -10; x < 10; x++) {
+            for (let z = -10; z < 10; z++) {
+                if (Math.random() < 0.01) {
+                    addBlock(x, 0, z); // Tree block
+                } else {
+                    addBlock(x, -1, z); // Ground block
+                }
             }
         }
 
-        // Mouse click to place block
-        canvas.addEventListener('click', (event) => {
-            const rect = canvas.getBoundingClientRect();
-            const x = Math.floor((event.clientX - rect.left) / gridSize);
-            const y = Math.floor((event.clientY - rect.top) / gridSize);
-            blocks[`${x},${y}`] = getBlockColor(selectedBlock); // Place block
-            draw();
+        camera.position.z = 5;
+
+        // Mouse lock functionality
+        document.addEventListener('click', () => {
+            document.body.requestPointerLock();
         });
 
-        // Function to get block color based on type
-        function getBlockColor(type) {
-            switch (type) {
-                case 'grass': return 'green';
-                case 'dirt': return 'brown';
-                case 'stone': return 'gray';
-                default: return 'white';
-            }
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
         }
-
-        // Block selection
-        function selectBlock(type) {
-            selectedBlock = type;
-        }
-
-        // Player movement
-        const player = { x: 0, y: 0 };
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'ArrowUp') player.y--;
-            if (event.key === 'ArrowDown') player.y++;
-            if (event.key === 'ArrowLeft') player.x--;
-            if (event.key === 'ArrowRight') player.x++;
-            draw();
-        });
-
-        // Draw loop
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drawBlocks();
-            ctx.fillStyle = 'blue'; // Player color
-            ctx.fillRect(player.x * gridSize, player.y * gridSize, gridSize, gridSize); // Draw player
-        }
-
-        draw();
+        animate();
     </script>
 </body>
 </html>
