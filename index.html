@@ -2,56 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Minecraft-Like Game</title>
+    <title>Study Notes - Portal</title>
     <style>
-        canvas { display: block; }
+        body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; padding: 20px; color: #333; }
+        h1 { color: #2c3e50; text-align: center; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
+        .card { background: #3498db; color: white; padding: 15px; text-align: center; border-radius: 6px; cursor: pointer; text-decoration: none; font-weight: bold; }
+        .card:hover { background: #2980b9; }
     </style>
 </head>
 <body>
-    <script src="https://threejs.org/build/three.js"></script>
-    <script>
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        const blocks = {};
-
-        // Function to add a block
-        function addBlock(x, y, z) {
-            const cube = new THREE.Mesh(geometry, material);
-            cube.position.set(x, y, z);
-            scene.add(cube);
-            blocks[`${x},${y},${z}`] = cube;
-        }
-
-        // Generate blocks with a 1/100 chance of being a tree
-        for (let x = -10; x < 10; x++) {
-            for (let z = -10; z < 10; z++) {
-                if (Math.random() < 0.01) {
-                    addBlock(x, 0, z); // Tree block
-                } else {
-                    addBlock(x, -1, z); // Ground block
-                }
-            }
-        }
-
-        camera.position.z = 5;
-
-        // Mouse lock functionality
-        document.addEventListener('click', () => {
-            document.body.requestPointerLock();
-        });
-
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
-        animate();
-    </script>
+    <div class="container">
+        <h1>Educational Resources</h1>
+        <p style="text-align: center;">Select an activity below:</p>
+        <div class="grid">
+            <a class="card" href="javascript:alert('Practice math daily!');">Math Logic</a>
+            <a class="card" href="javascript:alert('Keep solving puzzles!');">Number Grid</a>
+            <a class="card" href="data:text/html,<h1>Mini Game Placeholder</h1><p>Run your local scripts here.</p>">Quick Puzzle</a>
+        </div>
+    </div>
 </body>
 </html>
